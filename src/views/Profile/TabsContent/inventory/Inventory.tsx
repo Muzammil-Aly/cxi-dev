@@ -241,7 +241,12 @@ const Inventory = () => {
   //   setPendingDrawer(type);
   // };
 
-  const handleCellClick = (type: "qty" | "so" | "po", data: any) => {
+  const handleCellClick = (type: "qty" | "sku" | "lot_no" | "so" | "po", data: any) => {
+    // Only handle qty, so, and po clicks in inventory
+    if (type !== "qty" && type !== "so" && type !== "po") {
+      return;
+    }
+
     //  If same item + same drawer clicked again → close it
     if (
       selectedInventoryItem?.item_no === data.item_no &&

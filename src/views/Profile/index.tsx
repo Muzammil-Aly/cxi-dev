@@ -46,20 +46,22 @@ const Profile = () => {
       key: "Customer Profiles",
       label: "Customer Profiles",
       icon: <InfoIcon />,
+      path: "/customer-profiles",
     },
     // {
     //   key: "Customer Profiles",
     //   label: "Customer Profiles",
     //   icon: <PeopleIcon />,
     // },
-    { key: "Orders", label: "Orders", icon: <ShoppingCartIcon /> },
+    { key: "Orders", label: "Orders", icon: <ShoppingCartIcon />, path: "/orders" },
     {
       key: "Support Tickets",
       label: "Support Tickets",
       icon: <SupportAgentIcon />,
+      path: "/support-tickets",
     },
-    { key: "Marketing Events", label: "Marketing Events", icon: <EventIcon /> },
-    { key: "Inventory", label: "Inventory", icon: <InventoryIcon /> },
+    { key: "Marketing Events", label: "Marketing Events", icon: <EventIcon />, path: "/marketing-events" },
+    { key: "Inventory", label: "Inventory", icon: <InventoryIcon />, path: "/inventory" },
   ];
 
   const menuConfig: Record<string, { component?: React.ReactNode }> = {
@@ -78,7 +80,6 @@ const Profile = () => {
         <Sidebar
           menuItems={menuItems}
           activeMenu={activeMenu}
-          setActiveMenu={setActiveMenu}
           onLogout={handleLogout}
         />
       </Box>
