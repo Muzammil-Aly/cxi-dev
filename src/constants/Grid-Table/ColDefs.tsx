@@ -182,7 +182,7 @@ export const orders = [
 ];
 
 export const orderItems = (
-  onCellClick: (type: "sku" | "lot_no", data: any) => void
+  onCellClick: (type: "qty" | "sku" | "lot_no" | "so" | "po", data: any) => void
 ) => [
   {
     field: "sku",
@@ -1105,7 +1105,7 @@ export const ClickableCellRenderer = (
 
 // 👇\ now accepts a click handler for qty, so, and po
 export const inventory_columns = (
-  onCellClick: (type: "qty" | "so" | "po", data: any) => void
+  onCellClick: (type: "qty" | "sku" | "lot_no" | "so" | "po", data: any) => void
 ) => [
   {
     field: "item_no",
