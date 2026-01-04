@@ -44,8 +44,19 @@ const OrderItems = ({
   filters,
   onCellClick,
 }: Props) => {
+  // Wrapper function to handle all cell click types
+  const handleCellClick = (
+    type: "qty" | "sku" | "lot_no" | "so" | "po",
+    data: any
+  ) => {
+    // Only call onCellClick for sku and lot_no types
+    if (onCellClick && (type === "sku" || type === "lot_no")) {
+      onCellClick(type, data);
+    }
+  };
+
   const orderItemsCol = useOrderItems(
-    orderItems(onCellClick || (() => {}))
+    orderItems(handleCellClick)
   );
   const { isActive, activeTabName, isTouchupsOpen } = useSelector(
     (state: RootState) => state.tab
