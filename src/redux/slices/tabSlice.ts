@@ -47,6 +47,7 @@ interface TabState {
   isTouchupsOpen: boolean;
   isTouchupPensOpen: boolean;
   isCustomerSegmentsOpen: boolean;
+  isLocationItemLotOpen: boolean;
 }
 
 const initialState: TabState = {
@@ -57,6 +58,7 @@ const initialState: TabState = {
   isTouchupsOpen: false,
   isTouchupPensOpen: false,
   isCustomerSegmentsOpen: false,
+  isLocationItemLotOpen: false,
 };
 
 const tabSlice = createSlice({
@@ -85,11 +87,16 @@ const tabSlice = createSlice({
       state.isTouchupPensOpen = action.payload;
     },
 
+    setLocationItemLotOpen: (state, action: PayloadAction<boolean>) => {
+      state.isLocationItemLotOpen = action.payload;
+    },
+
     resetAllTabs: (state) => {
       state.isOrderItemsOpen = false;
       state.isTouchupsOpen = false;
       state.isTouchupPensOpen = false;
       state.isCustomerSegmentsOpen = false;
+      state.isLocationItemLotOpen = false;
     },
   },
 });
@@ -100,6 +107,7 @@ export const {
   setTouchupsOpen,
   setTouchupPensOpen,
   setCustomerSegmentsOpen,
+  setLocationItemLotOpen,
   resetAllTabs,
 } = tabSlice.actions;
 

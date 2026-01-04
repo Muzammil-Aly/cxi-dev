@@ -6,7 +6,7 @@ import {
   sidebarItems,
   sidebarItemsMobile,
 } from "./sidebarItem";
-import Logo from "../../assests/images/logo.png";
+import Logo from "../../assets/images/logo.png";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 

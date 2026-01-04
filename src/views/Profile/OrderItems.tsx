@@ -17,12 +17,13 @@ import {
   setTouchupsOpen,
   setTouchupPensOpen,
   resetAllTabs,
-} from "../../app/redux/tabSlice";
+} from "@/redux/slices/tabSlice";
 interface Props {
   orderId: string;
   setSelectedOrderItem?: React.Dispatch<React.SetStateAction<any | null>>;
   orderItemSec?: boolean;
   filters?: string;
+  onCellClick?: (type: "sku" | "lot_no", data: any) => void;
 }
 interface OrderItem {
   line_no: string | number;
@@ -41,8 +42,11 @@ const OrderItems = ({
   setSelectedOrderItem,
   orderItemSec,
   filters,
+  onCellClick,
 }: Props) => {
-  const orderItemsCol = useOrderItems(orderItems);
+  const orderItemsCol = useOrderItems(
+    orderItems(onCellClick || (() => {}))
+  );
   const { isActive, activeTabName, isTouchupsOpen } = useSelector(
     (state: RootState) => state.tab
   );
@@ -90,6 +94,20 @@ const OrderItems = ({
     const event = params?.event;
     if ((event?.target as HTMLElement).closest(".MuiIconButton-root")) {
       return; // ignore clicks from any MUI icon button
+    }
+
+    // Ignore clicks on clickable cells (SKU and lot_no) and copy buttons
+    const clickedElement = event?.target as HTMLElement;
+    const clickedOnClickableCell =
+      clickedElement?.closest("span[style*='cursor: pointer']") ||
+      clickedElement?.closest("span[style*='cursor:pointer']") ||
+      clickedElement?.closest("button") ||
+      clickedElement?.tagName === "BUTTON" ||
+      clickedElement?.tagName === "svg" ||
+      clickedElement?.tagName === "path";
+
+    if (clickedOnClickableCell) {
+      return; // ignore clicks from clickable cells and copy buttons
     }
 
     if (selectedItemDetail?.sku === params.data.sku) {

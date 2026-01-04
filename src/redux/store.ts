@@ -1,27 +1,39 @@
 import { configureStore } from "@reduxjs/toolkit";
-import { klaviyoApi } from "./services/profileApi";
 import { OrdersApi } from "./services/ordersApi";
 import { supportTicketsApi } from "./services/supportTicketsApi";
-import { InventoryApi } from "./services/InventoryApi";
+import { inventoryApi } from "./services/InventoryApi";
 import { MarketingEventsApi } from "./services/MarketingEvents";
-import tabReducer from "../app/redux/tabSlice";
+import { customerApi } from "./services/customerApi";
+import { orderApi } from "./services/orderApi";
+import { supportApi } from "./services/supportApi";
+import { eventsApi } from "./services/eventsApi";
+import tabReducer from "./slices/tabSlice";
 export const store = configureStore({
   reducer: {
-    [klaviyoApi.reducerPath]: klaviyoApi.reducer,
+    // Legacy APIs (keep temporarily for backwards compatibility)
     [OrdersApi.reducerPath]: OrdersApi.reducer,
     [supportTicketsApi.reducerPath]: supportTicketsApi.reducer,
     [MarketingEventsApi.reducerPath]: MarketingEventsApi.reducer,
-    [InventoryApi.reducerPath]: InventoryApi.reducer,
+    // New domain-specific APIs
+    [customerApi.reducerPath]: customerApi.reducer,
+    [orderApi.reducerPath]: orderApi.reducer,
+    [supportApi.reducerPath]: supportApi.reducer,
+    [eventsApi.reducerPath]: eventsApi.reducer,
+    [inventoryApi.reducerPath]: inventoryApi.reducer,
     tab: tabReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware()
-      .concat(klaviyoApi.middleware)
+      // Legacy API middleware (keep temporarily)
       .concat(OrdersApi.middleware)
       .concat(supportTicketsApi.middleware)
       .concat(MarketingEventsApi.middleware)
-
-      .concat(InventoryApi.middleware),
+      // New domain-specific API middleware
+      .concat(customerApi.middleware)
+      .concat(orderApi.middleware)
+      .concat(supportApi.middleware)
+      .concat(eventsApi.middleware)
+      .concat(inventoryApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

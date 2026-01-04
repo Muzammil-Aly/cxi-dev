@@ -9,7 +9,7 @@ import { useGetLocationItemLotQuery } from "@/redux/services/profileApi";
 import { getRowStyle } from "@/utils/gridStyles";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../redux/store";
-import { setTouchupsOpen } from "../../app/redux/tabSlice";
+import { setTouchupsOpen } from "@/redux/slices/tabSlice";
 
 interface Props {
   orderId?: string;

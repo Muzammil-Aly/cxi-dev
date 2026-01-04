@@ -1,8 +1,12 @@
-import React from "react";
-import Home from "@/views/Profile";
+import ProfileLayout from "@/views/Profile/ProfileLayout";
+import DetailedInfo from "@/views/Profile/TabsContent/profile-Information/ProfileInfo";
 
-const page = () => {
-  return <Home />;
+const ProfilePage = () => {
+  return (
+    <ProfileLayout activeMenu="Customer Profiles">
+      <DetailedInfo />
+    </ProfileLayout>
+  );
 };
 
-export default page;
+export default ProfilePage;

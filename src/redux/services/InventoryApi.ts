@@ -1,7 +1,7 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 
-export const InventoryApi = createApi({
-  reducerPath: "InventoryApi",
+export const inventoryApi = createApi({
+  reducerPath: "inventoryApi",
   baseQuery: fetchBaseQuery({
     baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
     prepareHeaders: (headers) => {
@@ -171,6 +171,216 @@ export const InventoryApi = createApi({
         };
       },
     }),
+
+    // Inventory endpoints from profileApi.ts
+    getInventory: builder.query<
+      any,
+      {
+        item_no?: string;
+        location_code?: any;
+        description?: string;
+        eta?: string;
+        qty?: number;
+        qty_available?: number;
+        avail_qty_on_hand?: number;
+        avail_qty_to_commit?: number;
+        qty_on_blocked_lot_bin?: number;
+        page?: number;
+        page_size?: number;
+        life_cycle_status_code?: string;
+      }
+    >({
+      query: ({
+        item_no,
+        location_code,
+        description,
+        eta,
+        qty,
+        qty_available,
+        avail_qty_on_hand,
+        avail_qty_to_commit,
+        qty_on_blocked_lot_bin,
+        life_cycle_status_code,
+        page = 1,
+        page_size = 10,
+      }) => {
+        const params = new URLSearchParams();
+        params.set("page", page.toString());
+        params.set("page_size", page_size.toString());
+
+        if (item_no) params.set("item_no", item_no);
+        if (Array.isArray(location_code) && location_code.length > 0) {
+          params.set("location_code", location_code.join(","));
+        } else if (location_code) {
+          params.set("location_code", location_code);
+        }
+        if (description) params.set("description", description);
+        if (eta) params.set("eta", eta);
+        if (qty !== undefined) params.set("qty", qty.toString());
+        if (qty_available !== undefined)
+          params.set("qty_available", qty_available.toString());
+        if (avail_qty_on_hand !== undefined)
+          params.set("avail_qty_on_hand", avail_qty_on_hand.toString());
+        if (avail_qty_to_commit !== undefined)
+          params.set("avail_qty_to_commit", avail_qty_to_commit.toString());
+
+        if (life_cycle_status_code !== undefined)
+          params.set(
+            "life_cycle_status_code",
+            life_cycle_status_code.toString()
+          );
+
+        if (qty_on_blocked_lot_bin !== undefined)
+          params.set(
+            "qty_on_blocked_lot_bin",
+            qty_on_blocked_lot_bin.toString()
+          );
+
+        return `inventory_Availability?${params.toString()}`;
+      },
+    }),
+
+    getLocationItemLot: builder.query<
+      any,
+      { sku: string; page?: number; page_size?: number }
+    >({
+      query: ({ sku, page = 1, page_size = 10 }) => {
+        const params = new URLSearchParams();
+
+        params.set("page", page.toString());
+        params.set("page_size", page_size.toString());
+        if (sku) params.set("sku", sku);
+
+        return `/location_item_lot?${params.toString()}`;
+      },
+    }),
+
+    getTouchups: builder.query<
+      any,
+      {
+        page?: number;
+        page_size?: number;
+        order_id?: string;
+        lot_no?: string | null;
+        sku?: string;
+        customer_id?: string;
+        parts_item_no?: string;
+        parts_item_name?: string;
+        parts_item_name_2?: string;
+        touchup_pen_item_no?: string;
+        touchup_pen_item_name?: string;
+        brand?: string;
+        color_slug?: string;
+        color_name?: string;
+        parts_version?: string;
+      }
+    >({
+      query: ({
+        page = 1,
+        page_size = 10,
+        order_id,
+        lot_no,
+        sku,
+        customer_id,
+        parts_item_no,
+        parts_item_name,
+        parts_item_name_2,
+        touchup_pen_item_no,
+        touchup_pen_item_name,
+        brand,
+        color_slug,
+        color_name,
+        parts_version,
+      }) => {
+        const params = new URLSearchParams();
+        params.set("page", page.toString());
+        params.set("page_size", page_size.toString());
+        if (order_id) params.set("order_id", order_id);
+        if (lot_no) params.set("lot_no", lot_no);
+        if (sku) params.set("sku", sku);
+        if (customer_id) params.set("customer_id", customer_id);
+        if (parts_item_no) params.set("parts_item_no", parts_item_no);
+        if (parts_item_name) params.set("parts_item_name", parts_item_name);
+        if (parts_item_name_2)
+          params.set("parts_item_name_2", parts_item_name_2);
+        if (touchup_pen_item_no)
+          params.set("touchup_pen_item_no", touchup_pen_item_no);
+        if (touchup_pen_item_name)
+          params.set("touchup_pen_item_name", touchup_pen_item_name);
+        if (brand) params.set("brand", brand);
+        if (color_slug) params.set("color_slug", color_slug);
+        if (color_name) params.set("color_name", color_name);
+        if (parts_version) params.set("parts_version", parts_version);
+
+        return `touchup_part?${params.toString()}`;
+      },
+    }),
+
+    getTouchupPens: builder.query<
+      any,
+      {
+        page?: number;
+        page_size?: number;
+        color_slug?: string | null;
+        item_num?: string;
+        item_name?: string;
+        item_name2?: string;
+        color_name?: string;
+        sku?: string;
+        QtyAvailable?: string;
+      }
+    >({
+      query: ({
+        page = 1,
+        page_size = 10,
+        color_slug,
+        item_num,
+        item_name,
+        item_name2,
+        color_name,
+        sku,
+        QtyAvailable,
+      }) => {
+        const params = new URLSearchParams();
+        params.set("page", page.toString());
+        params.set("page_size", page_size.toString());
+
+        if (color_slug) params.set("Colorslug", color_slug);
+        if (item_num) params.set("item_num", item_num);
+        if (item_name) params.set("item_name", item_name);
+        if (item_name2) params.set("ItemName2", item_name2);
+        if (color_name) params.set("ColorName", color_name);
+        if (sku) params.set("sku", sku);
+        if (QtyAvailable) params.set("QtyAvailable", QtyAvailable);
+
+        return `touchup_pen?${params.toString()}`;
+      },
+
+      transformResponse: (response: any) => {
+        const items = response?.data || [];
+        return {
+          results: Array.isArray(items)
+            ? items.map((item: any) => ({
+                ItemNum: item.ItemNum,
+                ItemName: item.ItemName,
+                ItemName2: item.ItemName2,
+                Colorslug: item.Colorslug,
+                ColorName: item.ColorName,
+                QtyAvailable: item.QtyAvailable,
+              }))
+            : [],
+          total_pages: response?.total_pages ?? 1,
+          count: response?.count ?? items.length,
+        };
+      },
+    }),
+
+    getLifeCycleStatus: builder.query<any, string | void>({
+      query: (name = "") => ({
+        url: "/inventory/life_cycle_status",
+        params: name ? { name } : {},
+      }),
+    })
   }),
 });
 export const {
@@ -183,4 +393,10 @@ export const {
   useLazyGetQTYtwoInventoryTableQuery, // <-- add this
   useLazyGetSOInventoryTableQuery, // optional, if needed
   useLazyGetPOInventoryTableQuery, // optional, if needed
-} = InventoryApi;
+  // New inventory endpoints
+  useGetInventoryQuery,
+  useGetLocationItemLotQuery,
+  useGetTouchupsQuery,
+  useGetTouchupPensQuery,
+  useGetLifeCycleStatusQuery,
+} = inventoryApi;

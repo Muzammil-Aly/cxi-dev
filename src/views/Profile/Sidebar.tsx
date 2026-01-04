@@ -174,26 +174,27 @@
 import React, { useState, useEffect } from "react";
 import { Box, Button, Typography, Avatar, Popover } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
+import { useRouter } from "next/navigation";
 
 interface SidebarItem {
   key: string;
   label: string;
   icon: React.ReactNode;
+  path: string;
 }
 
 interface SidebarProps {
   menuItems: SidebarItem[];
   activeMenu: string;
-  setActiveMenu: (key: string) => void;
   onLogout: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
   menuItems,
   activeMenu,
-  setActiveMenu,
   onLogout,
 }) => {
+  const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
 
@@ -285,7 +286,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {menuItems.map((item) => (
         <Box
           key={item.key}
-          onClick={() => setActiveMenu(item.key)}
+          onClick={() => router.push(item.path)}
           sx={{
             display: "flex",
             alignItems: "center",

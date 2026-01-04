@@ -13,7 +13,9 @@
 //   { field: "last_order_date", headerName: "Last Order Date" },
 //   { field: "total_orders", headerName: "Total Orders" },
 // ];
+import React from "react";
 import { margin } from "@mui/system";
+import toast from "react-hot-toast";
 import CopyCellRenderer from "./CopyCellRenderer";
 
 export const users = [
@@ -179,9 +181,19 @@ export const orders = [
   // { field: "channel", headerName: "Channel", cellRenderer: CopyCellRenderer },
 ];
 
-export const orderItems = [
-  { field: "sku", headerName: "SKU", cellRenderer: CopyCellRenderer },
-  { field: "lot_no", headerName: "Lot No", cellRenderer: CopyCellRenderer },
+export const orderItems = (
+  onCellClick: (type: "sku" | "lot_no", data: any) => void
+) => [
+  {
+    field: "sku",
+    headerName: "SKU",
+    cellRenderer: ClickableCellRenderer(onCellClick, "sku"),
+  },
+  {
+    field: "lot_no",
+    headerName: "Lot No",
+    cellRenderer: ClickableCellRenderer(onCellClick, "lot_no"),
+  },
   {
     field: "product_name",
     headerName: "Product Name",
@@ -991,40 +1003,102 @@ export const touchups_pens = [
 //     );
 
 export const ClickableCellRenderer = (
-  onClick: (type: "qty" | "so" | "po", data: any) => void,
-  type: "qty" | "so" | "po",
-  loadingType?: "qty" | "so" | "po" | null
+  onClick: (type: "qty" | "so" | "po" | "sku" | "lot_no", data: any) => void,
+  type: "qty" | "so" | "po" | "sku" | "lot_no",
+  loadingType?: "qty" | "so" | "po" | "sku" | "lot_no" | null
 ) => {
-  const Renderer = (params: any) => (
-    <span
-      style={{
-        color:
-          type === "qty" ? "#1976d2" : type === "so" ? "#2e7d32" : "#9c27b0",
-        cursor: "pointer",
-        fontWeight: "bold",
-      }}
-      onClick={() => onClick(type, params.data)}
-    >
-      {loadingType === type ? (
-        <span
-          className="loader"
-          style={{
-            display: "inline-block",
-            width: 14,
-            height: 14,
-            border: "2px solid #ccc",
-            borderTop: "2px solid currentColor",
-            borderRadius: "50%",
-            animation: "spin 1s linear infinite",
-          }}
-        />
-      ) : (
-        params.value
-      )}
-    </span>
-  );
+  const Renderer = (params: any) => {
+    const [hover, setHover] = React.useState(false);
+    const { value } = params;
 
-  Renderer.displayName = `ClickableCellRenderer_${type}`; //  add this
+    const handleCopy = (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      e.preventDefault();
+      e.nativeEvent.stopImmediatePropagation();
+      if (value !== undefined && value !== null) {
+        navigator.clipboard.writeText(String(value)).then(() => {
+          toast.success("Copied to clipboard!");
+        });
+      }
+    };
+
+    return (
+      <div
+        style={{ display: "flex", alignItems: "center", justifyContent: "start" }}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+      >
+        {/* Copy icon */}
+        {value !== null && value !== undefined && value !== "N/A" && (
+          <button
+            onClick={handleCopy}
+            style={{
+              marginLeft: -25,
+              visibility: hover ? "visible" : "hidden",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              padding: "4px",
+              display: "flex",
+              alignItems: "center",
+            }}
+            className="no-drag"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
+            </svg>
+          </button>
+        )}
+
+        <span
+          style={{
+            color:
+              type === "qty"
+                ? "#1976d2"
+                : type === "so"
+                ? "#2e7d32"
+                : type === "po"
+                ? "#9c27b0"
+                : type === "sku"
+                ? "#1976d2"
+                : type === "lot_no"
+                ? "#2e7d32"
+                : "#1976d2",
+            cursor: "pointer",
+            fontWeight: "bold",
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick(type, params.data);
+          }}
+        >
+          {loadingType === type ? (
+            <span
+              className="loader"
+              style={{
+                display: "inline-block",
+                width: 14,
+                height: 14,
+                border: "2px solid #ccc",
+                borderTop: "2px solid currentColor",
+                borderRadius: "50%",
+                animation: "spin 1s linear infinite",
+              }}
+            />
+          ) : (
+            value ?? "N/A"
+          )}
+        </span>
+      </div>
+    );
+  };
+
+  Renderer.displayName = `ClickableCellRenderer_${type}`;
 
   return Renderer;
 };

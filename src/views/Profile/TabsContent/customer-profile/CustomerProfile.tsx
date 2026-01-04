@@ -36,7 +36,7 @@ import {
   setTouchupPensOpen,
   resetAllTabs,
   setCustomerSegmentsOpen,
-} from "../../../../app/redux/tabSlice";
+} from "@/redux/slices/tabSlice";
 const CustomerProfile = () => {
   const dispatch = useDispatch();
 
