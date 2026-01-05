@@ -55,9 +55,7 @@ const OrderItems = ({
     }
   };
 
-  const orderItemsCol = useOrderItems(
-    orderItems(handleCellClick)
-  );
+  const orderItemsCol = useOrderItems(orderItems(handleCellClick));
   const { isActive, activeTabName, isTouchupsOpen } = useSelector(
     (state: RootState) => state.tab
   );

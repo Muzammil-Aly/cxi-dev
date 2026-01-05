@@ -103,7 +103,7 @@ const ResponsiveDashboard = ({
   const handleCellClick = (type: "sku" | "lot_no", data: any) => {
     if (type === "sku") {
       // Toggle: if same SKU clicked again, close the table
-      if (isLocationItemLotOpen && selectedOrderItem?.sku === data.sku) {
+      if (isLocationItemLotOpen && selectedOrderItem === data) {
         dispatch(setLocationItemLotOpen(false));
         setSelectedOrderItem(null);
       } else {
@@ -114,7 +114,7 @@ const ResponsiveDashboard = ({
       }
     } else if (type === "lot_no") {
       // Toggle: if same lot_no clicked again, close the table
-      if (isTouchupsOpen && selectedOrderItem?.lot_no === data.lot_no) {
+      if (isTouchupsOpen && selectedOrderItem === data) {
         dispatch(setTouchupsOpen(false));
         setSelectedOrderItem(null);
         setSelectedOrderItemLotNo(null);
@@ -323,7 +323,8 @@ const ResponsiveDashboard = ({
             p: 2,
             borderRadius: 3,
             height: "100%",
-            display: isLocationItemLotOpen && selectedOrderId ? "block" : "none",
+            display:
+              isLocationItemLotOpen && selectedOrderId ? "block" : "none",
           }}
         >
           {selectedOrderItem && (
