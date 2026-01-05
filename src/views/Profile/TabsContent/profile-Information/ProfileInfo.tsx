@@ -375,6 +375,7 @@ const DetailedInfo = () => {
           onPageChange={(newPage: any) => setPage(newPage)}
           pagination={false}
           paginationPageSize={pageSize}
+          storageKey="profile-info-grid-columns"
         />
       )}
       <UserDetailsModal

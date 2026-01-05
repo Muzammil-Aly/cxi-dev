@@ -52,25 +52,25 @@ const ProfileLayout: React.FC<ProfileLayoutProps> = ({
       key: "Orders",
       label: "Orders",
       icon: <ShoppingCartIcon />,
-      path: "/profile/orders",
+      path: "/orders",
     },
     {
       key: "Support Tickets",
       label: "Support Tickets",
       icon: <SupportAgentIcon />,
-      path: "/profile/support-tickets",
+      path: "/support-tickets",
     },
     {
       key: "Marketing Events",
       label: "Marketing Events",
       icon: <EventIcon />,
-      path: "/profile/marketing-events",
+      path: "/marketing-events",
     },
     {
       key: "Inventory",
       label: "Inventory",
       icon: <InventoryIcon />,
-      path: "/profile/inventory",
+      path: "/inventory",
     },
   ];
 

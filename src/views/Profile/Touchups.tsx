@@ -414,6 +414,7 @@ const Touchups = ({
           totalPages={data?.total_pages || 1}
           onPageChange={(newPage: number) => setPage(newPage)}
           paginationPageSize={pageSizeInput}
+          storageKey="touchups-grid-columns"
         />
       )}
     </Box>
