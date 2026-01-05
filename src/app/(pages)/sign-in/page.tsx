@@ -181,7 +181,7 @@ export default function SignIn() {
 
         // Use window.location.href for full page reload to ensure cookie is sent to server
         setTimeout(() => {
-          window.location.href = "/customer-profile";
+          window.location.href = "/profile";
         }, 500);
       } else {
         setSeverity("error");
