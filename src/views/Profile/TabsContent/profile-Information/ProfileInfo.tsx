@@ -114,15 +114,19 @@ const DetailedInfo = () => {
   const userId = localStorage.getItem("userId");
 
   // Fetch user preferences for column ordering filtered by endpoint
-  const { data: userPreferences } = useGetUserPreferencesQuery({
-    user_id: userId,
-    endpoint: "customer_profile",
-  });
+  const { data: userPreferences } = useGetUserPreferencesQuery(
+    userId
+      ? {
+          user_id: userId,
+          endpoint: "customer_profile",
+        }
+      : undefined
+  );
 
   // Sort columns based on user preferences
   const filteredColumns = useMemo(() => {
     // If no preferences data, return all default columns
-    if (!userPreferences?.data || userPreferences.data.length === 0) {
+    if (!userPreferences || !Array.isArray(userPreferences) || userPreferences.length === 0) {
       console.log("No user preferences data, returning all columns");
       return users;
     }
@@ -131,9 +135,9 @@ const DetailedInfo = () => {
 
     // Create a map of preference field to sort order
     const preferenceMap = new Map(
-      userPreferences.data.map((pref: any) => [
+      userPreferences.map((pref: any) => [
         pref.preference,
-        pref.preference_sort,
+        Number(pref.preference_sort),
       ])
     );
 
