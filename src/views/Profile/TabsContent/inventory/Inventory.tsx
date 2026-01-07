@@ -22,7 +22,10 @@ import TouchupsPens from "../../TouchupsPens";
 import { inventory_columns } from "@/constants/Grid-Table/ColDefs";
 import useInventoryColumn from "@/hooks/Ag-Grid/useInventoryColumn";
 import Loader from "@/components/Common/Loader";
-import { useGetInventoryQuery } from "@/redux/services/profileApi";
+import {
+  useGetInventoryQuery,
+  useGetUserPreferencesQuery,
+} from "@/redux/services/profileApi";
 import { getRowStyle } from "@/utils/gridStyles";
 import SearchInput from "@/components/Common/CustomSearch/SearchInput";
 import DropdownSearchInput from "@/components/Common/CustomSearch/DropdownSearchInput";
@@ -39,7 +42,14 @@ import { useGetLifeCycleStatusQuery } from "@/redux/services/profileApi";
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 const Inventory = () => {
-  // const tiCol = useInventoryColumn(inventory_columns);
+  // Get user ID from localStorage
+  const userId = localStorage.getItem("userId") || undefined;
+
+  // Fetch user preferences for column ordering filtered by endpoint
+  const { data: userPreferences } = useGetUserPreferencesQuery({
+    user_id: userId,
+    endpoint: "inventory_Availability",
+  });
 
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(10);
@@ -115,9 +125,12 @@ const Inventory = () => {
           qty_on_po: item.qty_on_po,
           property_code: item.property_code,
           unit_price: item.unit_price,
+          qty_on_inspecting_lot: item.qty_on_inspecting_lot,
+          expected_receipt_qty: item.expected_receipt_qty,
         }))
       : [];
   }, [data]);
+  console.log("rowData from inventory 09", rowData);
 
   const {
     data: locationCodeSuggestions = [],
@@ -241,7 +254,10 @@ const Inventory = () => {
   //   setPendingDrawer(type);
   // };
 
-  const handleCellClick = (type: "qty" | "sku" | "lot_no" | "so" | "po", data: any) => {
+  const handleCellClick = (
+    type: "qty" | "sku" | "lot_no" | "so" | "po",
+    data: any
+  ) => {
     // Only handle qty, so, and po clicks in inventory
     if (type !== "qty" && type !== "so" && type !== "po") {
       return;
@@ -286,8 +302,40 @@ const Inventory = () => {
     }
   }, [selectedInventoryItem, pendingDrawer]);
 
-  // now you can safely use it here
-  const tiCol = useInventoryColumn(inventory_columns(handleCellClick));
+  // Sort columns based on user preferences
+  const filteredColumns = useMemo(() => {
+    // Generate columns from function first
+    const baseColumns = inventory_columns(handleCellClick);
+
+    // If no preferences data, return all default columns
+    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
+      return baseColumns;
+    }
+
+    const prefsData = (userPreferences as any).data;
+
+    // Create a map of preference field to sort order
+    const preferenceMap = new Map(
+      prefsData.map((pref: any) => [
+        pref.preference,
+        pref.preference_sort,
+      ])
+    );
+
+    // Filter columns that exist in preferences and sort by preference_sort
+    const orderedColumns = baseColumns
+      .filter((col) => preferenceMap.has(col.field))
+      .sort((a, b) => {
+        const sortA = (preferenceMap.get(a.field) as number) || 999;
+        const sortB = (preferenceMap.get(b.field) as number) || 999;
+        return sortA - sortB;
+      });
+
+    return orderedColumns;
+  }, [userPreferences, handleCellClick]);
+
+  // Apply column customization
+  const tiCol = useInventoryColumn(filteredColumns);
   return (
     <Box sx={{ width: "100%", minHeight: "100vh", overflow: "hidden" }}>
       {/* ================= Filters ================= */}

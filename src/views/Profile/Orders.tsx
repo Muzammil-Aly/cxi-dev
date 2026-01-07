@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Box,
   Typography,
@@ -54,9 +54,75 @@ import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import CircularLoader from "@/components/Common/CustomSearch/CircularLoader";
+import { useGetUserPreferencesQuery } from "@/redux/services/profileApi";
 
 const Orders = ({ customerId }: { customerId?: string }) => {
-  const orderCol = useOrdersColumn(orders);
+  // Get user ID from localStorage
+  const userId = localStorage.getItem("userId") || undefined;
+
+  // Fetch user preferences for column ordering filtered by endpoint
+  const { data: userPreferences } = useGetUserPreferencesQuery({
+    user_id: userId,
+    endpoint: "customer_orders",
+  });
+
+  // Store default preferences on initial load
+  const [defaultPreferences, setDefaultPreferences] = useState<
+    Map<string, any>
+  >(new Map());
+
+  // Sort columns based on user preferences
+  const filteredColumns = useMemo(() => {
+    // If no preferences data, return all default columns
+    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
+      console.log("No user preferences data, returning all columns");
+      return orders;
+    }
+
+    console.log("User preferences data:", userPreferences);
+
+    const prefsData = (userPreferences as any).data;
+
+    // Store default preferences on first load (only once)
+    if (defaultPreferences.size === 0) {
+      const defaultMap = new Map<string, any>(
+        prefsData.map((pref: any) => [
+          pref.preference,
+          {
+            default_preference: pref.default_preference,
+            defualt_sort: pref.defualt_sort, // Keep original typo as is in backend
+          },
+        ])
+      );
+      setDefaultPreferences(defaultMap);
+    }
+
+    // Create a map of preference field to sort order
+    const preferenceMap = new Map(
+      prefsData.map((pref: any) => [
+        pref.preference,
+        pref.preference_sort,
+      ])
+    );
+
+    console.log("Preference map:", preferenceMap);
+
+    // Filter columns that exist in preferences and sort by preference_sort
+    const orderedColumns = orders
+      .filter((col) => preferenceMap.has(col.field))
+      .sort((a, b) => {
+        const sortA = (preferenceMap.get(a.field) as number) || 999;
+        const sortB = (preferenceMap.get(b.field) as number) || 999;
+        return sortA - sortB;
+      });
+
+    console.log("Ordered columns:", orderedColumns);
+
+    return orderedColumns;
+  }, [userPreferences]);
+
+  // Apply column customization
+  const orderCol = useOrdersColumn(filteredColumns);
 
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [page, setPage] = useState(1);
@@ -253,6 +319,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
       release_error: item.release_error || "N/A",
       extend_flag: item.extend_flag,
       redo_flag: item.redo_flag,
+      shipping_agent_code: item.shipping_agent_code || "N/A",
     }));
   }, [data]);
 
@@ -320,9 +387,9 @@ const Orders = ({ customerId }: { customerId?: string }) => {
   useEffect(() => {
     if (
       orderIdFilter && // user searched by Order ID
-      data?.orders?.length === 1 // only one match
+      data?.data?.length === 1 // only one match
     ) {
-      setSelectedOrder(data.orders[0]); // auto-select it
+      setSelectedOrder(data.data[0]); // auto-select it
     }
   }, [orderIdFilter, data]);
   const onRowClicked = (params: any) => {
@@ -556,6 +623,47 @@ const Orders = ({ customerId }: { customerId?: string }) => {
 
   const hasActiveFilters = activeFilters.length > 0;
   // ----------------------------------------------------------------
+
+  // Handle column reorder event
+  const handleColumnMoved = useCallback(
+    (event: any) => {
+      // Only process when the drag is finished
+      if (event.finished && event.api) {
+        const columnState = event.api.getColumnState();
+
+        // Map column state to the backend format
+        const preferencesData = columnState
+          .filter((col: any) => col.colId) // Filter out any invalid columns
+          .map((col: any, index: number) => {
+            // Get the stored default values for this column
+            const defaults = defaultPreferences.get(col.colId);
+
+            return {
+              user_id: userId, // Use userId from component state
+              endpoint: "customer_orders",
+              preference: col.colId, // The current field name (e.g., "order_id", "customer_name")
+              preference_sort: index + 1, // The NEW sort order after drag (1, 2, 3, 4...)
+              default_preference: defaults?.default_preference || col.colId, // The ORIGINAL default preference (unchanged)
+              defualt_sort: defaults?.defualt_sort || index + 1, // The ORIGINAL default sort order (unchanged)
+            };
+          });
+
+        // Create the full API request payload
+        const apiPayload = {
+          data: preferencesData,
+        };
+
+        // Console log the data that would be sent to the API
+        console.log("=== Column Order Update Payload ===");
+        console.log("Endpoint:", "customer_orders");
+        console.log("Number of columns:", preferencesData.length);
+        console.log("Full API Payload:", JSON.stringify(apiPayload, null, 2));
+
+        // TODO: Implement update logic when needed
+      }
+    },
+    [defaultPreferences, userId]
+  );
 
   return (
     <Box display="flex">
@@ -966,6 +1074,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
               pagination={false}
               currentMenu="orders"
               paginationPageSize={pageSize}
+              onColumnMoved={handleColumnMoved}
               filters={{
                 orderIdFilter,
                 customerIdFilter,

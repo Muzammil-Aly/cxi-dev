@@ -44,13 +44,52 @@ import {
   useGetTicketTagsQuery,
 } from "@/redux/services/supportTicketsApi";
 import DropdownSearchInput from "@/components/Common/CustomSearch/DropdownSearchInput";
+import { useGetUserPreferencesQuery } from "@/redux/services/profileApi";
 
 interface OrdersProps {
   customerId?: string; // optional prop
 }
 
 const SupportTickets = ({ customerId }: { customerId?: string }) => {
-  const ticketColumns = useSupportTicketColumn(support_tickets);
+  // Get user ID from localStorage
+  const userId = localStorage.getItem("userId") || undefined;
+
+  // Fetch user preferences for column ordering filtered by endpoint
+  const { data: userPreferences } = useGetUserPreferencesQuery({
+    user_id: userId,
+    endpoint: "support_tickets",
+  });
+
+  // Sort columns based on user preferences
+  const filteredColumns = useMemo(() => {
+    // If no preferences data, return all default columns
+    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
+      return support_tickets;
+    }
+
+    const prefsData = (userPreferences as any).data;
+
+    // Create a map of preference field to sort order
+    const preferenceMap = new Map(
+      prefsData.map((pref: any) => [
+        pref.preference,
+        pref.preference_sort,
+      ])
+    );
+
+    // Filter columns that exist in preferences and sort by preference_sort
+    const orderedColumns = support_tickets
+      .filter((col) => preferenceMap.has(col.field))
+      .sort((a, b) => {
+        const sortA = (preferenceMap.get(a.field) as number) || 999;
+        const sortB = (preferenceMap.get(b.field) as number) || 999;
+        return sortA - sortB;
+      });
+
+    return orderedColumns;
+  }, [userPreferences]);
+
+  const ticketColumns = useSupportTicketColumn(filteredColumns);
 
   const [selectedTicket, setSelectedTicket] = useState<any>(null);
   const [page, setPage] = useState(1);

@@ -108,6 +108,22 @@ const useInventory = (columns: Column[]) => {
             minWidth: 160,
             cellStyle: { fontSize: "16px" },
           };
+        case "qty_on_inspecting_lot":
+          return {
+            ...col,
+            headerName: "Qty on Inspecting Lot",
+            flex: 1,
+            minWidth: 160,
+            cellStyle: { fontSize: "16px" },
+          };
+        case "expected_receipt_qty":
+          return {
+            ...col,
+            headerName: "Expected Receipt Qty",
+            flex: 1,
+            minWidth: 160,
+            cellStyle: { fontSize: "16px" },
+          };
         default:
           return col;
       }

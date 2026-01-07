@@ -154,6 +154,14 @@ const useOrdersColumn = (columns: Column[]) => {
           };
         case "channel":
           return { ...col, headerName: "Channel", minWidth: 140 };
+        case "shipping_agent_code":
+          return {
+            ...col,
+            headerName: "Shipping Agent Code",
+            flex: 1,
+            minWidth: 180,
+            cellStyle: { whiteSpace: "normal" },
+          };
         default:
           return col;
       }

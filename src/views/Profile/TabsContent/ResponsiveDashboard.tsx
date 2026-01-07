@@ -44,6 +44,7 @@ const ResponsiveDashboard = ({
   paginationPageSize,
   getRowStyle,
   filters,
+  onColumnMoved,
 }: any) => {
   const dispatch = useDispatch();
 
@@ -277,6 +278,7 @@ const ResponsiveDashboard = ({
               pagination
               paginationPageSize={paginationPageSize}
               cancel=".no-drag .MuiIconButton-root"
+              onColumnMoved={onColumnMoved}
             />
           </Box>
         </Paper>

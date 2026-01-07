@@ -5,7 +5,7 @@ import AgGridTable from "@/components/ag-grid";
 import { Refunds } from "@/constants/Grid-Table/ColDefs";
 import useRefundColumn from "@/hooks/Ag-Grid/useRefundColumn";
 import Loader from "@/components/Common/Loader";
-import { useGetRefundsQuery } from "@/redux/services/profileApi";
+import { useGetRefundsQuery, useGetUserPreferencesQuery } from "@/redux/services/profileApi";
 import { getRowStyle } from "@/utils/gridStyles";
 
 interface Props {
@@ -37,7 +37,45 @@ interface ReturnItem {
 }
 
 const Refund = ({ customer_id }: Props) => {
-  const columns = useRefundColumn(Refunds);
+  // Get user ID from localStorage
+  const userId = localStorage.getItem("userId") || undefined;
+
+  // Fetch user preferences for column ordering filtered by endpoint
+  const { data: userPreferences } = useGetUserPreferencesQuery({
+    user_id: userId,
+    endpoint: "orders_refund",
+  });
+
+  // Sort columns based on user preferences
+  const filteredColumns = useMemo(() => {
+    // If no preferences data, return all default columns
+    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
+      return Refunds;
+    }
+
+    const prefsData = (userPreferences as any).data;
+
+    // Create a map of preference field to sort order
+    const preferenceMap = new Map(
+      prefsData.map((pref: any) => [
+        pref.preference,
+        pref.preference_sort,
+      ])
+    );
+
+    // Filter columns that exist in preferences and sort by preference_sort
+    const orderedColumns = Refunds
+      .filter((col) => preferenceMap.has(col.field))
+      .sort((a, b) => {
+        const sortA = (preferenceMap.get(a.field) as number) || 999;
+        const sortB = (preferenceMap.get(b.field) as number) || 999;
+        return sortA - sortB;
+      });
+
+    return orderedColumns;
+  }, [userPreferences]);
+
+  const columns = useRefundColumn(filteredColumns);
 
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
     null

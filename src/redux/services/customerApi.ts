@@ -93,6 +93,39 @@ export const customerApi = createApi({
     getZendeskTickets: builder.query<any, { email?: string }>({
       query: ({ email }) => `/zendesk_tickets?email=${email}`,
     }),
+
+    //   getUserPreferences: builder.query<
+    //     any[],
+    //     { endpoint?: string; user_id?: string } | void
+    //   >({
+    //     query: (params) => {
+    //       const searchParams = new URLSearchParams();
+
+    //       if (params?.endpoint) searchParams.set("endpoint", params.endpoint);
+    //       if (params?.user_id) searchParams.set("user_id", params.user_id);
+
+    //       const queryString = searchParams.toString();
+    //       return `/user_prefernce_view${queryString ? `?${queryString}` : ""}`;
+    //     },
+    //   }),
+    // }),
+    getUserPreferences: builder.query<
+      any[],
+      { endpoint?: string; user_id?: string } | void
+    >({
+      query: (params) => {
+        const searchParams = new URLSearchParams();
+
+        // Fixed page size
+        searchParams.set("page_size", "100");
+
+        if (params?.endpoint) searchParams.set("endpoint", params.endpoint);
+        if (params?.user_id) searchParams.set("user_id", params.user_id);
+
+        const queryString = searchParams.toString();
+        return `/user_prefernce_view${queryString ? `?${queryString}` : ""}`;
+      },
+    }),
   }),
 });
 
@@ -104,4 +137,5 @@ export const {
   useGetPhoneQuery,
   useGetOrderHistoryQuery,
   useGetZendeskTicketsQuery,
+  useGetUserPreferencesQuery,
 } = customerApi;

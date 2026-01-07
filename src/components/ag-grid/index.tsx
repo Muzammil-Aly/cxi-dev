@@ -104,8 +104,13 @@ const AgGridTable: React.FC<any> = ({
         console.log("Column state:", columnState);
         localStorage.setItem(storageKey, JSON.stringify(columnState));
       }
+
+      // Call custom onColumnMoved handler if provided
+      if (gridProps.onColumnMoved) {
+        gridProps.onColumnMoved(event);
+      }
     },
-    [storageKey]
+    [storageKey, gridProps]
   );
 
   // Reset columns to default order

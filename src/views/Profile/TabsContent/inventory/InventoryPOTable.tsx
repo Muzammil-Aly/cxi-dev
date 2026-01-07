@@ -10,6 +10,7 @@ import { useLazyGetPOInventoryTableQuery } from "@/redux/services/InventoryApi";
 import { getRowStyle } from "@/utils/gridStyles";
 import Loader from "@/components/Common/Loader";
 import { Paper, Box, FormControl, TextField, MenuItem } from "@mui/material";
+import { useGetUserPreferencesQuery } from "@/redux/services/profileApi";
 
 interface InventoryPOTableProps {
   location_code?: string;
@@ -20,7 +21,46 @@ const InventoryPOTable: React.FC<InventoryPOTableProps> = ({
   location_code,
   item_no,
 }) => {
-  const tiCol = usePurchaseOrders(purchase_orders);
+  // Get user ID from localStorage
+  const userId = localStorage.getItem("userId") || undefined;
+
+  // Fetch user preferences for column ordering filtered by endpoint
+  const { data: userPreferences } = useGetUserPreferencesQuery({
+    user_id: userId,
+    endpoint: "qty_po_pop_up",
+  });
+
+  // Sort columns based on user preferences
+  const filteredColumns = useMemo(() => {
+    // If no preferences data, return all default columns
+    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
+      return purchase_orders;
+    }
+
+    const prefsData = (userPreferences as any).data;
+
+    // Create a map of preference field to sort order
+    const preferenceMap = new Map(
+      prefsData.map((pref: any) => [
+        pref.preference,
+        pref.preference_sort,
+      ])
+    );
+
+    // Filter columns that exist in preferences and sort by preference_sort
+    const orderedColumns = purchase_orders
+      .filter((col) => preferenceMap.has(col.field))
+      .sort((a, b) => {
+        const sortA = (preferenceMap.get(a.field) as number) || 999;
+        const sortB = (preferenceMap.get(b.field) as number) || 999;
+        return sortA - sortB;
+      });
+
+    return orderedColumns;
+  }, [userPreferences]);
+
+  // Apply column customization
+  const tiCol = usePurchaseOrders(filteredColumns);
 
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(10);

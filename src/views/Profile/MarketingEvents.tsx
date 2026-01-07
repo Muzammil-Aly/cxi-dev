@@ -12,7 +12,7 @@ import {
   InputAdornment,
   CircularProgress,
 } from "@mui/material";
-import { useGetCustomerEventsQuery } from "@/redux/services/profileApi";
+import { useGetCustomerEventsQuery, useGetUserPreferencesQuery } from "@/redux/services/profileApi";
 import CloseIcon from "@mui/icons-material/Close";
 
 import Loader from "@/components/Common/Loader";
@@ -37,7 +37,47 @@ interface MarketingEventsProps {
   customerId?: string; // optional prop
 }
 const MarketingEvents: React.FC<MarketingEventsProps> = ({ customerId }) => {
-  const eventCol = useMarketingEvents(marketing_events);
+  // Get user ID from localStorage
+  const userId = localStorage.getItem("userId") || undefined;
+
+  // Fetch user preferences for column ordering filtered by endpoint
+  const { data: userPreferences } = useGetUserPreferencesQuery({
+    user_id: userId,
+    endpoint: "customer_events",
+  });
+
+  // Sort columns based on user preferences
+  const filteredColumns = useMemo(() => {
+    // If no preferences data, return all default columns
+    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
+      return marketing_events;
+    }
+
+    const prefsData = (userPreferences as any).data;
+
+    // Create a map of preference field to sort order
+    const preferenceMap = new Map(
+      prefsData.map((pref: any) => [
+        pref.preference,
+        pref.preference_sort,
+      ])
+    );
+
+    // Filter columns that exist in preferences and sort by preference_sort
+    const orderedColumns = marketing_events
+      .filter((col) => preferenceMap.has(col.field))
+      .sort((a, b) => {
+        const sortA = (preferenceMap.get(a.field) as number) || 999;
+        const sortB = (preferenceMap.get(b.field) as number) || 999;
+        return sortA - sortB;
+      });
+
+    return orderedColumns;
+  }, [userPreferences]);
+
+  // Apply column customization
+  const eventCol = useMarketingEvents(filteredColumns);
+
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
     null
   );

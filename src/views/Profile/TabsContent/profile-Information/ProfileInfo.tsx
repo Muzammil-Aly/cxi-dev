@@ -22,7 +22,7 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import UserDetailsModal from "../profile-Information/UserDetailsModal";
 import CustomSearchField from "@/components/Common/CustomSearch";
 import { Phone, Send } from "@mui/icons-material";
@@ -40,6 +40,7 @@ import CustomSelect from "@/components/Common/CustomTabs/CustomSelect";
 import {
   useGetFullNamesQuery,
   useGetPhoneQuery,
+  useGetUserPreferencesQuery,
 } from "@/redux/services/profileApi";
 import DropdownSearchInput from "@/components/Common/CustomSearch/DropdownSearchInput";
 
@@ -48,8 +49,6 @@ interface SegmentOption {
   name: string;
 }
 const DetailedInfo = () => {
-  const userCol = useUsersColumn(users);
-
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [searchInput, setSearchInput] = useState("");
@@ -110,6 +109,52 @@ const DetailedInfo = () => {
     useGetPhoneQuery(phoneNumberInput, {
       skip: phoneNumberInput.trim().length < 1,
     });
+
+  // Get user ID from localStorage
+  const userId = localStorage.getItem("userId");
+
+  // Fetch user preferences for column ordering filtered by endpoint
+  const { data: userPreferences } = useGetUserPreferencesQuery({
+    user_id: userId,
+    endpoint: "customer_profile",
+  });
+
+  // Sort columns based on user preferences
+  const filteredColumns = useMemo(() => {
+    // If no preferences data, return all default columns
+    if (!userPreferences?.data || userPreferences.data.length === 0) {
+      console.log("No user preferences data, returning all columns");
+      return users;
+    }
+
+    console.log("User preferences data:", userPreferences);
+
+    // Create a map of preference field to sort order
+    const preferenceMap = new Map(
+      userPreferences.data.map((pref: any) => [
+        pref.preference,
+        pref.preference_sort,
+      ])
+    );
+
+    console.log("Preference map:", preferenceMap);
+
+    // Filter columns that exist in preferences and sort by preference_sort
+    const orderedColumns = users
+      .filter((col) => preferenceMap.has(col.field))
+      .sort((a, b) => {
+        const sortA = preferenceMap.get(a.field) || 999;
+        const sortB = preferenceMap.get(b.field) || 999;
+        return sortA - sortB;
+      });
+
+    console.log("Ordered columns:", orderedColumns);
+
+    return orderedColumns;
+  }, [userPreferences]);
+
+  // Apply column customization
+  const userCol = useUsersColumn(filteredColumns);
 
   const rowData = useMemo(() => {
     const results = data?.data || [];

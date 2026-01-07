@@ -6,7 +6,7 @@ import useOrderItems from "@/hooks/Ag-Grid/useOrderItems";
 import { Box, Typography } from "@mui/material";
 import React, { useState, useMemo } from "react";
 import Loader from "@/components/Common/Loader";
-import { useGetOrderItemsQuery } from "@/redux/services/profileApi";
+import { useGetOrderItemsQuery, useGetUserPreferencesQuery } from "@/redux/services/profileApi";
 import { getRowStyle } from "@/utils/gridStyles";
 import { useSelector } from "react-redux";
 import { RootState } from "../../redux/store";
@@ -55,7 +55,47 @@ const OrderItems = ({
     }
   };
 
-  const orderItemsCol = useOrderItems(orderItems(handleCellClick));
+  // Get user ID from localStorage
+  const userId = localStorage.getItem("userId") || undefined;
+
+  // Fetch user preferences for column ordering filtered by endpoint
+  const { data: userPreferences } = useGetUserPreferencesQuery({
+    user_id: userId,
+    endpoint: "customer_order_items",
+  });
+
+  // Sort columns based on user preferences
+  const filteredColumns = useMemo(() => {
+    const baseColumns = orderItems(handleCellClick);
+
+    // If no preferences data, return all default columns
+    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
+      return baseColumns;
+    }
+
+    const prefsData = (userPreferences as any).data;
+
+    // Create a map of preference field to sort order
+    const preferenceMap = new Map(
+      prefsData.map((pref: any) => [
+        pref.preference,
+        pref.preference_sort,
+      ])
+    );
+
+    // Filter columns that exist in preferences and sort by preference_sort
+    const orderedColumns = baseColumns
+      .filter((col) => preferenceMap.has(col.field))
+      .sort((a, b) => {
+        const sortA = (preferenceMap.get(a.field) as number) || 999;
+        const sortB = (preferenceMap.get(b.field) as number) || 999;
+        return sortA - sortB;
+      });
+
+    return orderedColumns;
+  }, [userPreferences, handleCellClick]);
+
+  const orderItemsCol = useOrderItems(filteredColumns);
   const { isActive, activeTabName, isTouchupsOpen } = useSelector(
     (state: RootState) => state.tab
   );
