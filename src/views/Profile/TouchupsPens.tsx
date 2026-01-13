@@ -18,7 +18,8 @@ import Loader from "@/components/Common/Loader";
 import { touchups_pens } from "@/constants/Grid-Table/ColDefs";
 import useTouchupsPens from "@/hooks/Ag-Grid/useTouchupPens";
 import { getRowStyle } from "@/utils/gridStyles";
-import { useGetTouchupPensQuery, useGetUserPreferencesQuery } from "@/redux/services/profileApi";
+import { useGetTouchupPensQuery } from "@/redux/services/profileApi";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 
 interface Props {
   orderId?: string;
@@ -41,43 +42,16 @@ const TouchupsPens: React.FC<Props> = ({
   Colorslug,
   shouldFilterNull = false, // default: show all when Colorslug is null
 }) => {
-  // Get user ID from localStorage
-  const userId = localStorage.getItem("userId") || undefined;
-
-  // Fetch user preferences for column ordering filtered by endpoint
-  const { data: userPreferences } = useGetUserPreferencesQuery({
-    user_id: userId,
+  // Use column preferences hook
+  // Disable tab management when used as nested component (orderId, Colorslug props provided OR shouldFilterNull explicitly set)
+  const isNestedComponent = !!orderId || !!Colorslug || shouldFilterNull === false;
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
     endpoint: "touchup_pen",
+    tabName: "TouchupPens",
+    defaultColumns: touchups_pens,
+    disableTabManagement: isNestedComponent,
+    parentTabName: isNestedComponent ? "Inventory" : undefined, // Refetch when Inventory tab is activated
   });
-
-  // Sort columns based on user preferences
-  const filteredColumns = useMemo(() => {
-    // If no preferences data, return all default columns
-    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
-      return touchups_pens;
-    }
-
-    const prefsData = (userPreferences as any).data;
-
-    // Create a map of preference field to sort order
-    const preferenceMap = new Map(
-      prefsData.map((pref: any) => [
-        pref.preference,
-        pref.preference_sort,
-      ])
-    );
-
-    // Filter columns that exist in preferences and sort by preference_sort
-    const orderedColumns = touchups_pens
-      .filter((col) => preferenceMap.has(col.field))
-      .sort((a, b) => {
-        const sortA = (preferenceMap.get(a.field) as number) || 999;
-        const sortB = (preferenceMap.get(b.field) as number) || 999;
-        return sortA - sortB;
-      });
-
-    return orderedColumns;
-  }, [userPreferences]);
 
   // Apply column customization
   const touchupsPenCol = useTouchupsPens(filteredColumns);
@@ -399,6 +373,9 @@ const TouchupsPens: React.FC<Props> = ({
           totalPages={data?.total_pages || 1}
           onPageChange={(newPage: number) => setPage(newPage)}
           paginationPageSize={pageSizeInput}
+          onColumnMoved={handleColumnMoved}
+          onResetColumns={handleResetColumns}
+          storageKey={storageKey}
         />
       )}
     </Box>

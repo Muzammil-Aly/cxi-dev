@@ -13,6 +13,7 @@ export const customerApi = createApi({
       return headers;
     },
   }),
+  tagTypes: ["UserPreferences"],
   endpoints: (builder) => ({
     getProfiles: builder.query<
       any,
@@ -125,6 +126,16 @@ export const customerApi = createApi({
         const queryString = searchParams.toString();
         return `/user_prefernce_view${queryString ? `?${queryString}` : ""}`;
       },
+      providesTags: ["UserPreferences"],
+    }),
+
+    upsertUserPreferences: builder.mutation<any, { data: any[] }>({
+      query: (body) => ({
+        url: "/preferences/upsert",
+        method: "PATCH",
+        body,
+      }),
+      // Do not invalidate tags - we handle refetch manually in the hook to avoid unnecessary API calls
     }),
   }),
 });
@@ -138,4 +149,5 @@ export const {
   useGetOrderHistoryQuery,
   useGetZendeskTicketsQuery,
   useGetUserPreferencesQuery,
+  useUpsertUserPreferencesMutation,
 } = customerApi;

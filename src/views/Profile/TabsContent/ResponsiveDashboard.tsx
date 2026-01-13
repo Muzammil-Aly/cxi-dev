@@ -45,6 +45,7 @@ const ResponsiveDashboard = ({
   getRowStyle,
   filters,
   onColumnMoved,
+  onResetColumns,
 }: any) => {
   const dispatch = useDispatch();
 
@@ -279,6 +280,8 @@ const ResponsiveDashboard = ({
               paginationPageSize={paginationPageSize}
               cancel=".no-drag .MuiIconButton-root"
               onColumnMoved={onColumnMoved}
+              onResetColumns={onResetColumns}
+              storageKey={currentMenu ? `${currentMenu}-columnOrder` : undefined}
             />
           </Box>
         </Paper>

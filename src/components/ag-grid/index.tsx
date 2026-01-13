@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo, useCallback, useRef } from "react";
 import { AgGridReact } from "ag-grid-react";
 import "./index.scss";
 import { Box, IconButton, Tooltip } from "@mui/material";
@@ -32,7 +32,7 @@ ModuleRegistry.registerModules([
 
 const AgGridTable: React.FC<any> = ({
   rowData,
-  gridRef,
+  gridRef: externalGridRef,
   columnDefs,
   height = 500,
   width,
@@ -54,6 +54,10 @@ const AgGridTable: React.FC<any> = ({
 
   ...gridProps
 }) => {
+  // Create internal ref if external one not provided
+  const internalGridRef = useRef<any>(null);
+  const gridRef = externalGridRef || internalGridRef;
+
   const rowSelectionMemo = useMemo<
     RowSelectionOptions | "single" | "multiple"
   >(() => {
@@ -118,9 +122,14 @@ const AgGridTable: React.FC<any> = ({
     if (storageKey && gridRef?.current?.api) {
       localStorage.removeItem(storageKey);
       gridRef.current.api.resetColumnState();
-      console.log("Columns reset to default order");
+      console.log("✅ Columns reset to default order");
+
+      // Call custom onResetColumns handler if provided (to save default order to API)
+      if (gridProps.onResetColumns) {
+        gridProps.onResetColumns();
+      }
     }
-  }, [storageKey, gridRef]);
+  }, [storageKey, gridRef, gridProps]);
   // const onCellClicked = (params: any) => {
   //   navigator.clipboard.writeText(params.value).then(() => {
   //     console.log("Copied:", params.value);

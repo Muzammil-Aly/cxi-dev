@@ -30,7 +30,8 @@ export const authApi = createApi({
   }),
   endpoints: (builder) => ({
     getCxiUsers: builder.query<CxiUsersResponse, void>({
-      query: () => "/cxi_users",
+      // query: () => "/cxi_users",
+      query: () => `/cxi_users?page_size=100`,
     }),
   }),
 });

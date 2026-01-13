@@ -12,8 +12,9 @@ import {
   InputAdornment,
   CircularProgress,
 } from "@mui/material";
-import { useGetCustomerEventsQuery, useGetUserPreferencesQuery } from "@/redux/services/profileApi";
+import { useGetCustomerEventsQuery } from "@/redux/services/profileApi";
 import CloseIcon from "@mui/icons-material/Close";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 
 import Loader from "@/components/Common/Loader";
 import CustomSearchField from "@/components/Common/CustomSearch";
@@ -37,43 +38,12 @@ interface MarketingEventsProps {
   customerId?: string; // optional prop
 }
 const MarketingEvents: React.FC<MarketingEventsProps> = ({ customerId }) => {
-  // Get user ID from localStorage
-  const userId = localStorage.getItem("userId") || undefined;
-
-  // Fetch user preferences for column ordering filtered by endpoint
-  const { data: userPreferences } = useGetUserPreferencesQuery({
-    user_id: userId,
+  // Use column preferences hook
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
     endpoint: "customer_events",
+    tabName: "Marketing Events",
+    defaultColumns: marketing_events,
   });
-
-  // Sort columns based on user preferences
-  const filteredColumns = useMemo(() => {
-    // If no preferences data, return all default columns
-    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
-      return marketing_events;
-    }
-
-    const prefsData = (userPreferences as any).data;
-
-    // Create a map of preference field to sort order
-    const preferenceMap = new Map(
-      prefsData.map((pref: any) => [
-        pref.preference,
-        pref.preference_sort,
-      ])
-    );
-
-    // Filter columns that exist in preferences and sort by preference_sort
-    const orderedColumns = marketing_events
-      .filter((col) => preferenceMap.has(col.field))
-      .sort((a, b) => {
-        const sortA = (preferenceMap.get(a.field) as number) || 999;
-        const sortB = (preferenceMap.get(b.field) as number) || 999;
-        return sortA - sortB;
-      });
-
-    return orderedColumns;
-  }, [userPreferences]);
 
   // Apply column customization
   const eventCol = useMarketingEvents(filteredColumns);
@@ -335,6 +305,9 @@ const MarketingEvents: React.FC<MarketingEventsProps> = ({ customerId }) => {
               pagination={false}
               style={{ width: "100%", overflowX: "auto" }}
               paginationPageSize={pageSize}
+              onColumnMoved={handleColumnMoved}
+          onResetColumns={handleResetColumns}
+              storageKey={storageKey}
             />
           </Box>
         )}

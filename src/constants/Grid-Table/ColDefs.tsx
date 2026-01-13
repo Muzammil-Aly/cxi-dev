@@ -4,6 +4,8 @@ import toast from "react-hot-toast";
 import CopyCellRenderer from "./CopyCellRenderer";
 
 export const users = [
+  // { field: "email", headerName: "Email", cellRenderer: CopyCellRenderer },
+
   {
     field: "customer_id",
     headerName: "Customer ID",
@@ -155,8 +157,13 @@ export const orderItems = (
     cellRenderer: ClickableCellRenderer(onCellClick, "lot_no"),
   },
   {
-    field: "product_name",
-    headerName: "Product Name",
+    field: "description",
+    headerName: "Description",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "description_2",
+    headerName: "Description 2",
     cellRenderer: CopyCellRenderer,
   },
   { field: "quantity", headerName: "Quantity", cellRenderer: CopyCellRenderer },

@@ -10,7 +10,8 @@ import { sales_orders } from "@/constants/Grid-Table/ColDefs";
 import { useLazyGetSOInventoryTableQuery } from "@/redux/services/InventoryApi";
 import { getRowStyle } from "@/utils/gridStyles";
 import Loader from "@/components/Common/Loader";
-import { useGetUserPreferencesQuery } from "@/redux/services/profileApi";
+// import { useGetUserPreferencesQuery } from "@/redux/services/profileApi";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 
 interface InventorySOTableProps {
   location_code?: string;
@@ -22,44 +23,54 @@ const InventorySOTable: React.FC<InventorySOTableProps> = ({
   item_no,
 }) => {
   // Get user ID from localStorage
-  const userId = localStorage.getItem("userId") || undefined;
+  // const userId = localStorage.getItem("userId") || undefined;
 
-  // Fetch user preferences for column ordering filtered by endpoint
-  const { data: userPreferences } = useGetUserPreferencesQuery({
-    user_id: userId,
-    endpoint: "qty_so_pop_up",
-  });
+  // // Fetch user preferences for column ordering filtered by endpoint
+  // const { data: userPreferences } = useGetUserPreferencesQuery({
+  //   user_id: userId,
+  //   endpoint: "qty_so_pop_up",
+  // });
 
-  // Sort columns based on user preferences
-  const filteredColumns = useMemo(() => {
-    // If no preferences data, return all default columns
-    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
-      return sales_orders;
-    }
+  // // Sort columns based on user preferences
+  // const filteredColumns = useMemo(() => {
+  //   // If no preferences data, return all default columns
+  //   if (
+  //     !userPreferences ||
+  //     !(userPreferences as any)?.data ||
+  //     (userPreferences as any).data.length === 0
+  //   ) {
+  //     return sales_orders;
+  //   }
 
-    const prefsData = (userPreferences as any).data;
+  //   const prefsData = (userPreferences as any).data;
 
-    // Create a map of preference field to sort order
-    const preferenceMap = new Map(
-      prefsData.map((pref: any) => [
-        pref.preference,
-        pref.preference_sort,
-      ])
-    );
+  //   // Create a map of preference field to sort order
+  //   const preferenceMap = new Map(
+  //     prefsData.map((pref: any) => [pref.preference, pref.preference_sort])
+  //   );
 
-    // Filter columns that exist in preferences and sort by preference_sort
-    const orderedColumns = sales_orders
-      .filter((col) => preferenceMap.has(col.field))
-      .sort((a, b) => {
-        const sortA = (preferenceMap.get(a.field) as number) || 999;
-        const sortB = (preferenceMap.get(b.field) as number) || 999;
-        return sortA - sortB;
-      });
+  //   // Filter columns that exist in preferences and sort by preference_sort
+  //   const orderedColumns = sales_orders
+  //     .filter((col) => preferenceMap.has(col.field))
+  //     .sort((a, b) => {
+  //       const sortA = (preferenceMap.get(a.field) as number) || 999;
+  //       const sortB = (preferenceMap.get(b.field) as number) || 999;
+  //       return sortA - sortB;
+  //     });
 
-    return orderedColumns;
-  }, [userPreferences]);
+  //   return orderedColumns;
+  // }, [userPreferences]);
 
   // Apply column customization
+
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
+    useColumnPreferences({
+      endpoint: "qty_so_pop_up",
+      tabName: "InventorySOTable",
+      defaultColumns: sales_orders,
+      disableTabManagement: true,
+      parentTabName: "Inventory",
+    });
   const tiCol = useSalesOrders(filteredColumns);
 
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -189,6 +200,9 @@ const InventorySOTable: React.FC<InventorySOTableProps> = ({
             onPageChange={setPage}
             pagination
             paginationPageSize={pageSizeInput}
+            onColumnMoved={handleColumnMoved}
+            onResetColumns={handleResetColumns}
+            storageKey={storageKey}
           />
         )}
       </Paper>

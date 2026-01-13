@@ -5,11 +5,12 @@ import AgGridTable from "@/components/ag-grid";
 import { location_item_lot } from "@/constants/Grid-Table/ColDefs";
 import useLocationItemLot from "@/hooks/Ag-Grid/useLocationItemLot";
 import Loader from "@/components/Common/Loader";
-import { useGetLocationItemLotQuery, useGetUserPreferencesQuery } from "@/redux/services/profileApi";
+import { useGetLocationItemLotQuery } from "@/redux/services/profileApi";
 import { getRowStyle } from "@/utils/gridStyles";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../redux/store";
 import { setTouchupsOpen } from "@/redux/slices/tabSlice";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 
 interface Props {
   orderId?: string;
@@ -40,43 +41,15 @@ interface ZPartETAItem {
 }
 
 const LocationItemLot = ({ sku }: Props) => {
-  // Get user ID from localStorage
-  const userId = localStorage.getItem("userId") || undefined;
-
-  // Fetch user preferences for column ordering filtered by endpoint
-  const { data: userPreferences } = useGetUserPreferencesQuery({
-    user_id: userId,
+  // Use column preferences hook
+  // LocationItemLot is always nested (requires sku prop), so always disable tab management
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
     endpoint: "location_item_lot",
+    tabName: "LocationItemLot",
+    defaultColumns: location_item_lot,
+    disableTabManagement: true,
+    parentTabName: "Inventory", // Refetch when Inventory tab is activated
   });
-
-  // Sort columns based on user preferences
-  const filteredColumns = useMemo(() => {
-    // If no preferences data, return all default columns
-    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
-      return location_item_lot;
-    }
-
-    const prefsData = (userPreferences as any).data;
-
-    // Create a map of preference field to sort order
-    const preferenceMap = new Map(
-      prefsData.map((pref: any) => [
-        pref.preference,
-        pref.preference_sort,
-      ])
-    );
-
-    // Filter columns that exist in preferences and sort by preference_sort
-    const orderedColumns = location_item_lot
-      .filter((col) => preferenceMap.has(col.field))
-      .sort((a, b) => {
-        const sortA = (preferenceMap.get(a.field) as number) || 999;
-        const sortB = (preferenceMap.get(b.field) as number) || 999;
-        return sortA - sortB;
-      });
-
-    return orderedColumns;
-  }, [userPreferences]);
 
   // Apply column customization
   const orderItemsCol = useLocationItemLot(filteredColumns);
@@ -175,6 +148,9 @@ const LocationItemLot = ({ sku }: Props) => {
           pagination={false}
           currentMenu="support_tickets"
           paginationPageSize={pageSize}
+          onColumnMoved={handleColumnMoved}
+          onResetColumns={handleResetColumns}
+          storageKey={storageKey}
         />
       )}
     </Box>

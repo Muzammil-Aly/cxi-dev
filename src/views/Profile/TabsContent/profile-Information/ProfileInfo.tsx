@@ -3,6 +3,7 @@ import AgGridTable from "@/components/ag-grid";
 import { users } from "@/constants/Grid-Table/ColDefs";
 
 import useUsersColumn from "@/hooks/Ag-Grid/useUsersColumn";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import ClearIcon from "@mui/icons-material/Clear";
 
 import {
@@ -40,7 +41,6 @@ import CustomSelect from "@/components/Common/CustomTabs/CustomSelect";
 import {
   useGetFullNamesQuery,
   useGetPhoneQuery,
-  useGetUserPreferencesQuery,
 } from "@/redux/services/profileApi";
 import DropdownSearchInput from "@/components/Common/CustomSearch/DropdownSearchInput";
 
@@ -110,52 +110,13 @@ const DetailedInfo = () => {
       skip: phoneNumberInput.trim().length < 1,
     });
 
-  // Get user ID from localStorage
-  const userId = localStorage.getItem("userId");
-
-  // Fetch user preferences for column ordering filtered by endpoint
-  const { data: userPreferences } = useGetUserPreferencesQuery(
-    userId
-      ? {
-          user_id: userId,
-          endpoint: "customer_profile",
-        }
-      : undefined
-  );
-
-  // Sort columns based on user preferences
-  const filteredColumns = useMemo(() => {
-    // If no preferences data, return all default columns
-    if (!userPreferences || !Array.isArray(userPreferences) || userPreferences.length === 0) {
-      console.log("No user preferences data, returning all columns");
-      return users;
-    }
-
-    console.log("User preferences data:", userPreferences);
-
-    // Create a map of preference field to sort order
-    const preferenceMap = new Map(
-      userPreferences.map((pref: any) => [
-        pref.preference,
-        Number(pref.preference_sort),
-      ])
-    );
-
-    console.log("Preference map:", preferenceMap);
-
-    // Filter columns that exist in preferences and sort by preference_sort
-    const orderedColumns = users
-      .filter((col) => preferenceMap.has(col.field))
-      .sort((a, b) => {
-        const sortA = preferenceMap.get(a.field) || 999;
-        const sortB = preferenceMap.get(b.field) || 999;
-        return sortA - sortB;
-      });
-
-    console.log("Ordered columns:", orderedColumns);
-
-    return orderedColumns;
-  }, [userPreferences]);
+  // Use column preferences hook
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
+    endpoint: "customer_profile",
+    tabName: "Profile Information",
+    defaultColumns: users,
+    storageKey: "profile-info-grid-columns", // Match existing storageKey
+  });
 
   // Apply column customization
   const userCol = useUsersColumn(filteredColumns);
@@ -424,7 +385,9 @@ const DetailedInfo = () => {
           onPageChange={(newPage: any) => setPage(newPage)}
           pagination={false}
           paginationPageSize={pageSize}
-          storageKey="profile-info-grid-columns"
+          storageKey={storageKey}
+          onColumnMoved={handleColumnMoved}
+          onResetColumns={handleResetColumns}
         />
       )}
       <UserDetailsModal

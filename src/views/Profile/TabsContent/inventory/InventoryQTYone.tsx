@@ -10,6 +10,7 @@ import { getRowStyle } from "@/utils/gridStyles";
 import Loader from "@/components/Common/Loader";
 import test from "node:test";
 import { useGetUserPreferencesQuery } from "@/redux/services/profileApi";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 
 interface InventoryQTYone {
   location_code?: string;
@@ -23,43 +24,51 @@ const InventoryQTYone: React.FC<InventoryQTYone> = ({
   setSelectedQtyoneItem,
 }) => {
   // Get user ID from localStorage
-  const userId = localStorage.getItem("userId") || undefined;
+  // const userId = localStorage.getItem("userId") || undefined;
 
-  // Fetch user preferences for column ordering filtered by endpoint
-  const { data: userPreferences } = useGetUserPreferencesQuery({
-    user_id: userId,
-    endpoint: "qty_available_pop_up1",
-  });
+  // // Fetch user preferences for column ordering filtered by endpoint
+  // const { data: userPreferences } = useGetUserPreferencesQuery({
+  //   user_id: userId,
+  //   endpoint: "qty_available_pop_up1",
+  // });
 
-  // Sort columns based on user preferences
-  const filteredColumns = useMemo(() => {
-    // If no preferences data, return all default columns
-    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
-      return qty_one;
-    }
+  // // Sort columns based on user preferences
+  // const filteredColumns = useMemo(() => {
+  //   // If no preferences data, return all default columns
+  //   if (
+  //     !userPreferences ||
+  //     !(userPreferences as any)?.data ||
+  //     (userPreferences as any).data.length === 0
+  //   ) {
+  //     return qty_one;
+  //   }
 
-    const prefsData = (userPreferences as any).data;
+  //   const prefsData = (userPreferences as any).data;
 
-    // Create a map of preference field to sort order
-    const preferenceMap = new Map(
-      prefsData.map((pref: any) => [
-        pref.preference,
-        pref.preference_sort,
-      ])
-    );
+  //   // Create a map of preference field to sort order
+  //   const preferenceMap = new Map(
+  //     prefsData.map((pref: any) => [pref.preference, pref.preference_sort])
+  //   );
 
-    // Filter columns that exist in preferences and sort by preference_sort
-    const orderedColumns = qty_one
-      .filter((col) => preferenceMap.has(col.field))
-      .sort((a, b) => {
-        const sortA = (preferenceMap.get(a.field) as number) || 999;
-        const sortB = (preferenceMap.get(b.field) as number) || 999;
-        return sortA - sortB;
-      });
+  //   // Filter columns that exist in preferences and sort by preference_sort
+  //   const orderedColumns = qty_one
+  //     .filter((col) => preferenceMap.has(col.field))
+  //     .sort((a, b) => {
+  //       const sortA = (preferenceMap.get(a.field) as number) || 999;
+  //       const sortB = (preferenceMap.get(b.field) as number) || 999;
+  //       return sortA - sortB;
+  //     });
 
-    return orderedColumns;
-  }, [userPreferences]);
-
+  //   return orderedColumns;
+  // }, [userPreferences]);
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
+    useColumnPreferences({
+      endpoint: "qty_available_pop_up1",
+      tabName: "InventoryQTYone",
+      defaultColumns: qty_one,
+      disableTabManagement: true,
+      parentTabName: "Inventory",
+    });
   // Apply column customization
   const tiCol = useQTYone(filteredColumns);
 
@@ -170,6 +179,9 @@ const InventoryQTYone: React.FC<InventoryQTYone> = ({
             onPageChange={setPage}
             pagination
             paginationPageSize={pageSize}
+            onColumnMoved={handleColumnMoved}
+            onResetColumns={handleResetColumns}
+            storageKey={storageKey}
           />
         )}
       </Paper>

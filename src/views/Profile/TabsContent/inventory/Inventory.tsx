@@ -21,11 +21,9 @@ import Touchups from "../../Touchups";
 import TouchupsPens from "../../TouchupsPens";
 import { inventory_columns } from "@/constants/Grid-Table/ColDefs";
 import useInventoryColumn from "@/hooks/Ag-Grid/useInventoryColumn";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 import Loader from "@/components/Common/Loader";
-import {
-  useGetInventoryQuery,
-  useGetUserPreferencesQuery,
-} from "@/redux/services/profileApi";
+import { useGetInventoryQuery } from "@/redux/services/profileApi";
 import { getRowStyle } from "@/utils/gridStyles";
 import SearchInput from "@/components/Common/CustomSearch/SearchInput";
 import DropdownSearchInput from "@/components/Common/CustomSearch/DropdownSearchInput";
@@ -42,14 +40,6 @@ import { useGetLifeCycleStatusQuery } from "@/redux/services/profileApi";
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 const Inventory = () => {
-  // Get user ID from localStorage
-  const userId = localStorage.getItem("userId") || undefined;
-
-  // Fetch user preferences for column ordering filtered by endpoint
-  const { data: userPreferences } = useGetUserPreferencesQuery({
-    user_id: userId,
-    endpoint: "inventory_Availability",
-  });
 
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [pageSize, setPageSize] = useState(10);
@@ -302,37 +292,15 @@ const Inventory = () => {
     }
   }, [selectedInventoryItem, pendingDrawer]);
 
-  // Sort columns based on user preferences
-  const filteredColumns = useMemo(() => {
-    // Generate columns from function first
-    const baseColumns = inventory_columns(handleCellClick);
+  // Generate base columns with handleCellClick
+  const baseColumns = useMemo(() => inventory_columns(handleCellClick), [handleCellClick]);
 
-    // If no preferences data, return all default columns
-    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
-      return baseColumns;
-    }
-
-    const prefsData = (userPreferences as any).data;
-
-    // Create a map of preference field to sort order
-    const preferenceMap = new Map(
-      prefsData.map((pref: any) => [
-        pref.preference,
-        pref.preference_sort,
-      ])
-    );
-
-    // Filter columns that exist in preferences and sort by preference_sort
-    const orderedColumns = baseColumns
-      .filter((col) => preferenceMap.has(col.field))
-      .sort((a, b) => {
-        const sortA = (preferenceMap.get(a.field) as number) || 999;
-        const sortB = (preferenceMap.get(b.field) as number) || 999;
-        return sortA - sortB;
-      });
-
-    return orderedColumns;
-  }, [userPreferences, handleCellClick]);
+  // Use column preferences hook
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
+    endpoint: "inventory_Availability",
+    tabName: "Inventory",
+    defaultColumns: baseColumns,
+  });
 
   // Apply column customization
   const tiCol = useInventoryColumn(filteredColumns);
@@ -451,6 +419,9 @@ const Inventory = () => {
               onPageChange={setPage}
               pagination
               paginationPageSize={pageSize}
+              onColumnMoved={handleColumnMoved}
+              onResetColumns={handleResetColumns}
+              storageKey={storageKey}
             />
           )}
         </Paper>
@@ -468,7 +439,7 @@ const Inventory = () => {
             ml: 5,
           }}
         >
-          <Touchups />
+          <Touchups shouldFilterNull={false} />
         </Paper>
 
         {/* Touchups Pens */}
@@ -483,7 +454,7 @@ const Inventory = () => {
             ml: 5,
           }}
         >
-          <TouchupsPens />
+          <TouchupsPens shouldFilterNull={false} />
         </Paper>
       </ResponsiveGridLayout>
 

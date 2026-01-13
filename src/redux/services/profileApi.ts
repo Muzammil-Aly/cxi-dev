@@ -17,6 +17,7 @@ export {
   useGetOrderHistoryQuery,
   useGetZendeskTicketsQuery,
   useGetUserPreferencesQuery,
+  useUpsertUserPreferencesMutation,
 } from "./customerApi";
 
 // Order API exports

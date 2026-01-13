@@ -37,13 +37,24 @@ import {
   resetAllTabs,
   setCustomerSegmentsOpen,
 } from "@/redux/slices/tabSlice";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 const CustomerProfile = () => {
   const dispatch = useDispatch();
 
   const { isCustomerSegmentsOpen, activeTabName } = useSelector(
     (state: RootState) => state.tab
   );
-  const userCol = useUsersColumn(users);
+
+  // Use column preferences hook
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
+    endpoint: "customer_profile",
+    tabName: "Customer Profiles",
+    defaultColumns: users,
+    storageKey: "profiles-columnOrder", // Match the currentMenu value
+  });
+
+  // Apply column customization
+  const userCol = useUsersColumn(filteredColumns);
   const router = useRouter();
 
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -418,6 +429,8 @@ const CustomerProfile = () => {
             pagination={false}
             currentMenu="profiles"
             paginationPageSize={pageSize}
+            onColumnMoved={handleColumnMoved}
+          onResetColumns={handleResetColumns}
             filters={{
               searchTerm,
               sourceFilter,

@@ -1,6 +1,7 @@
 "use client";
 import { support_tickets } from "@/constants/Grid-Table/ColDefs";
 import useSupportTicketColumn from "@/hooks/Ag-Grid/useSupportTickets";
+import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 
 import {
   Box,
@@ -44,50 +45,18 @@ import {
   useGetTicketTagsQuery,
 } from "@/redux/services/supportTicketsApi";
 import DropdownSearchInput from "@/components/Common/CustomSearch/DropdownSearchInput";
-import { useGetUserPreferencesQuery } from "@/redux/services/profileApi";
 
 interface OrdersProps {
   customerId?: string; // optional prop
 }
 
 const SupportTickets = ({ customerId }: { customerId?: string }) => {
-  // Get user ID from localStorage
-  const userId = localStorage.getItem("userId") || undefined;
-
-  // Fetch user preferences for column ordering filtered by endpoint
-  const { data: userPreferences } = useGetUserPreferencesQuery({
-    user_id: userId,
+  // Use column preferences hook
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
     endpoint: "support_tickets",
+    tabName: "SupportTickets",
+    defaultColumns: support_tickets,
   });
-
-  // Sort columns based on user preferences
-  const filteredColumns = useMemo(() => {
-    // If no preferences data, return all default columns
-    if (!userPreferences || !(userPreferences as any)?.data || (userPreferences as any).data.length === 0) {
-      return support_tickets;
-    }
-
-    const prefsData = (userPreferences as any).data;
-
-    // Create a map of preference field to sort order
-    const preferenceMap = new Map(
-      prefsData.map((pref: any) => [
-        pref.preference,
-        pref.preference_sort,
-      ])
-    );
-
-    // Filter columns that exist in preferences and sort by preference_sort
-    const orderedColumns = support_tickets
-      .filter((col) => preferenceMap.has(col.field))
-      .sort((a, b) => {
-        const sortA = (preferenceMap.get(a.field) as number) || 999;
-        const sortB = (preferenceMap.get(b.field) as number) || 999;
-        return sortA - sortB;
-      });
-
-    return orderedColumns;
-  }, [userPreferences]);
 
   const ticketColumns = useSupportTicketColumn(filteredColumns);
 
@@ -496,6 +465,8 @@ const SupportTickets = ({ customerId }: { customerId?: string }) => {
               pagination={false}
               currentMenu="support_tickets"
               paginationPageSize={pageSize}
+              onColumnMoved={handleColumnMoved}
+              onResetColumns={handleResetColumns}
             />
           </Box>
         )}
