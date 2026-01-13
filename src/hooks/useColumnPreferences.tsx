@@ -389,7 +389,23 @@ export const useColumnPreferences = ({
         `[${tabName}] 💾 Resetting preference_sort to defualt_sort:`,
         defaultPreferencesData
       );
+      const newColumnOrder = defaultColumns
+        .filter((col) =>
+          defaultPreferencesData.find(
+            (pref: any) => pref.preference === col.field
+          )
+        )
+        .sort(
+          (a, b) =>
+            (defaultPreferencesData.find(
+              (pref: any) => pref.preference === a.field
+            )?.preference_sort || 0) -
+            (defaultPreferencesData.find(
+              (pref: any) => pref.preference === b.field
+            )?.preference_sort || 0)
+        );
 
+      setCurrentColumnOrder(newColumnOrder);
       upsertUserPreferences({ data: defaultPreferencesData })
         .unwrap()
         .then(() => {
