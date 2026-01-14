@@ -6,6 +6,7 @@ import {
   useGetUserPreferencesQuery,
   useUpsertUserPreferencesMutation,
 } from "@/redux/services/profileApi";
+import toast from "react-hot-toast";
 
 interface UseColumnPreferencesProps {
   endpoint: string; // e.g., "customer_orders", "inventory_Availability"
@@ -211,14 +212,6 @@ export const useColumnPreferences = ({
 
         // Debounce the API call by 500ms
         columnMoveTimerRef.current = setTimeout(async () => {
-          // Check if we're already saving
-          if (isSavingPreferences) {
-            console.log(
-              `[${tabName}] ⏳ Already saving preferences, skipping duplicate call`
-            );
-            return;
-          }
-
           // Map column state to the backend format
           const preferencesData = columnState
             .filter((col: any) => col.colId)
@@ -247,13 +240,18 @@ export const useColumnPreferences = ({
           setIsSavingPreferences(true);
 
           try {
+            const toastId = toast.loading("Saving column preferences...");
             await upsertUserPreferences(apiPayload).unwrap();
             console.log(
               `[${tabName}] ✅ Preferences synced with API successfully`
             );
             lastSavedOrderRef.current = columnOrderSignature;
+            toast.success("Column preferences saved successfully!", {
+              id: toastId,
+            });
           } catch (error) {
             console.error(`[${tabName}] ❌ Failed to sync with API:`, error);
+            toast.error("Failed to save column preferences. Please try again.");
           } finally {
             setIsSavingPreferences(false);
           }
@@ -265,7 +263,6 @@ export const useColumnPreferences = ({
       userId,
       endpoint,
       upsertUserPreferences,
-      isSavingPreferences,
       defaultColumns,
       tabName,
     ]
@@ -281,6 +278,11 @@ export const useColumnPreferences = ({
 
       return () => {
         dispatch(setActiveTab({ isActive: false, name: "" }));
+        // Cleanup pending timer on unmount
+        if (columnMoveTimerRef.current) {
+          clearTimeout(columnMoveTimerRef.current);
+          columnMoveTimerRef.current = null;
+        }
       };
     }
   }, [dispatch, tabName, disableTabManagement]);
@@ -296,6 +298,14 @@ export const useColumnPreferences = ({
       // Clear state
       setCurrentColumnOrder([]);
       setDefaultPreferences(new Map());
+      // Reset refs to allow new column moves
+      lastProcessedSignatureRef.current = "";
+      lastSavedOrderRef.current = "";
+      // Clear any pending timer
+      if (columnMoveTimerRef.current) {
+        clearTimeout(columnMoveTimerRef.current);
+        columnMoveTimerRef.current = null;
+      }
       // Clear localStorage to ensure API data is authoritative
       if (typeof window !== "undefined") {
         localStorage.removeItem(storageKey);
@@ -326,6 +336,14 @@ export const useColumnPreferences = ({
       // Clear state
       setCurrentColumnOrder([]);
       setDefaultPreferences(new Map());
+      // Reset refs to allow new column moves
+      lastProcessedSignatureRef.current = "";
+      lastSavedOrderRef.current = "";
+      // Clear any pending timer
+      if (columnMoveTimerRef.current) {
+        clearTimeout(columnMoveTimerRef.current);
+        columnMoveTimerRef.current = null;
+      }
       // Clear localStorage to ensure API data is authoritative
       if (typeof window !== "undefined") {
         localStorage.removeItem(storageKey);
@@ -406,12 +424,16 @@ export const useColumnPreferences = ({
         );
 
       setCurrentColumnOrder(newColumnOrder);
+      const toastId = toast.loading("Resetting columns to default...");
       upsertUserPreferences({ data: defaultPreferencesData })
         .unwrap()
         .then(() => {
           console.log(
             `[${tabName}] ✅ Columns reset to default order successfully`
           );
+          toast.success("Columns reset to default successfully!", {
+            id: toastId,
+          });
           // Wait before re-enabling column move handler to prevent race conditions
           setTimeout(() => {
             isLoadingFromAPIRef.current = false;
@@ -422,6 +444,9 @@ export const useColumnPreferences = ({
         })
         .catch((error) => {
           console.error(`[${tabName}] ❌ Failed to reset to default:`, error);
+          toast.error("Failed to reset columns. Please try again.", {
+            id: toastId,
+          });
           // Re-enable on error
           isLoadingFromAPIRef.current = false;
         });
