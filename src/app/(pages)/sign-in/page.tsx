@@ -14,8 +14,8 @@ import { useRouter } from "next/navigation";
 import CustomTextField from "@/components/Common/CustomTextField";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { IconButton, InputAdornment } from "@mui/material";
-import Cookies from "js-cookie";
-import { useGetCxiUsersQuery } from "@/redux/services/authApi";
+import { useLoginMutation } from "@/redux/services/authApi";
+import { setAuthTokens, setUserInfo } from "@/utils/auth";
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,38 +23,38 @@ export default function SignIn() {
   const [severity, setSeverity] = useState<
     "error" | "success" | "info" | "warning"
   >("info");
-  const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   const router = useRouter();
-  const { data: usersData, isLoading: isLoadingUsers } = useGetCxiUsersQuery();
+  const [login, { isLoading }] = useLoginMutation();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (loading || isLoadingUsers) return;
-    setLoading(true);
+    if (isLoading) return;
     setMessage("");
 
-    setTimeout(() => {
-      // Check if the entered credentials match any user from API
-      const user = usersData?.data.find(
-        (u) => u.email === email && u.password === password
-      );
+    try {
+      // Call the login API
+      const response = await login({ email, password }).unwrap();
 
-      if (user) {
+      if (response.status === 200 && response.data) {
+        // Store authentication tokens
+        setAuthTokens({
+          access_token: response.data.access_token,
+          refresh_token: response.data.refresh_token,
+          token_type: response.data.token_type,
+        });
+
+        // Store user information
+        setUserInfo({
+          user_id: response.data.user_id,
+          user_name: response.data.user_name,
+          email: response.data.email,
+        });
+
         setSeverity("success");
         setMessage("Signed in successfully!");
-        // Set cookie for server-side middleware (Vercel)
-        Cookies.set("loggedIn", "true", { expires: 7, path: "/" });
-        Cookies.set("userEmail", user.email, { expires: 7, path: "/" });
-        Cookies.set("userId", user.user_id, { expires: 7, path: "/" });
-        Cookies.set("userName", user.user_name, { expires: 7, path: "/" });
-        // Set localStorage for client-side checks
-        localStorage.setItem("loggedIn", "true");
-        localStorage.setItem("userEmail", user.email);
-        localStorage.setItem("userId", user.user_id);
-        localStorage.setItem("userName", user.user_name);
 
         // Use window.location.href for full page reload to ensure cookie is sent to server
         setTimeout(() => {
@@ -62,11 +62,16 @@ export default function SignIn() {
         }, 500);
       } else {
         setSeverity("error");
-        setMessage("Invalid email or password");
+        setMessage(response.message || "Login failed");
       }
-
-      setLoading(false);
-    }, 1000);
+    } catch (error: any) {
+      setSeverity("error");
+      setMessage(
+        error?.data?.message ||
+        error?.data?.system_error_message ||
+        "Invalid email or password"
+      );
+    }
   };
 
   return (
@@ -154,12 +159,12 @@ export default function SignIn() {
             variant="contained"
             color="primary"
             sx={{ py: 1.5, mt: 2, mb: 2 }}
-            disabled={loading || isLoadingUsers}
+            disabled={isLoading}
           >
-            {loading ? (
+            {isLoading ? (
               <>
                 <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                {loading ? "Loading..." : "Signing in…"}
+                Signing in…
               </>
             ) : (
               "Sign in"

@@ -1,13 +1,21 @@
 import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { getAccessToken } from "@/utils/auth";
 
 export const supportTicketsApi = createApi({
   reducerPath: "supportTicketsApi",
   baseQuery: fetchBaseQuery({
     baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
     prepareHeaders: (headers) => {
-      const token = process.env.NEXT_PUBLIC_DATABRICKS_PAT;
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
+      // Try to get JWT token first
+      const jwtToken = getAccessToken();
+      if (jwtToken) {
+        headers.set("Authorization", `Bearer ${jwtToken}`);
+      } else {
+        // Fallback to Databricks PAT for backwards compatibility
+        const token = process.env.NEXT_PUBLIC_DATABRICKS_PAT;
+        if (token) {
+          headers.set("Authorization", `Bearer ${token}`);
+        }
       }
       headers.set("Content-Type", "application/json");
       return headers;

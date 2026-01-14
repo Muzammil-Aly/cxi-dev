@@ -8,7 +8,6 @@ import EventIcon from "@mui/icons-material/Event";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import Sidebar from "./Sidebar";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 import {
   Typography,
   IconButton,
@@ -17,6 +16,7 @@ import {
 } from "@mui/material";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
+import { clearAuthData } from "@/utils/auth";
 
 interface ProfileLayoutProps {
   children: React.ReactNode;
@@ -30,14 +30,8 @@ const ProfileLayout: React.FC<ProfileLayoutProps> = ({
   const router = useRouter();
 
   const handleLogout = () => {
-    // Clear cookies for server-side middleware (Vercel)
-    Cookies.remove("loggedIn", { path: "/" });
-    Cookies.remove("userEmail", { path: "/" });
-    Cookies.remove("userName", { path: "/" });
-    // Clear localStorage for client-side checks
-    localStorage.removeItem("loggedIn");
-    localStorage.removeItem("userEmail");
-    localStorage.removeItem("userName");
+    // Clear all authentication data (tokens, cookies, localStorage)
+    clearAuthData();
     router.push("/sign-in");
   };
 

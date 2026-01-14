@@ -7,17 +7,19 @@ import { store } from "@/redux/store";
 import React, { useState, useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import Loader from "@/components/Common/Loader";
+import SessionManager from "@/components/Auth/SessionManager";
+import { isAuthenticated as checkAuth } from "@/utils/auth";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const router = useRouter();
-  // const isAuthPage = pathname === "/sign-in" || pathname === "/forgot-password";
 
   const publicPaths = ["/sign-in", "/forgot-password"];
   const isAuthPage = publicPaths.includes(pathname);
+
   useEffect(() => {
-    const auth = localStorage.getItem("loggedIn") === "true";
+    const auth = checkAuth();
     setIsAuthenticated(auth);
 
     if (!auth && !isAuthPage) {
@@ -50,6 +52,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <Provider store={store}>
+      <SessionManager />
       {isAuthPage ? children : content}
       <Toaster position="top-center" reverseOrder={false} />
     </Provider>
