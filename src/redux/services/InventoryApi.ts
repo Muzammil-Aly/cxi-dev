@@ -257,9 +257,21 @@ export const inventoryApi = createApi({
 
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
-        if (sku) params.set("sku", sku);
+        if (sku) params.set("item_no", sku);
 
         return `/location_item_lot?${params.toString()}`;
+      },
+    }),
+
+    getNavETA: builder.query<
+      any,
+      { sku: string; page?: number; page_size?: number }
+    >({
+      query: ({ sku }) => {
+        const params = new URLSearchParams();
+        if (sku) params.set("item_no", sku);
+
+        return `/nav_eta?${params.toString()}`;
       },
     }),
 
@@ -388,7 +400,7 @@ export const inventoryApi = createApi({
         url: "/inventory/life_cycle_status",
         params: name ? { name } : {},
       }),
-    })
+    }),
   }),
 });
 export const {
@@ -407,4 +419,5 @@ export const {
   useGetTouchupsQuery,
   useGetTouchupPensQuery,
   useGetLifeCycleStatusQuery,
+  useGetNavETAQuery,
 } = inventoryApi;

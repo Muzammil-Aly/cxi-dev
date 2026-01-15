@@ -2,14 +2,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import AgGridTable from "@/components/ag-grid";
-import { location_item_lot } from "@/constants/Grid-Table/ColDefs";
+import { nav_eta } from "@/constants/Grid-Table/ColDefs";
 import useLocationItemLot from "@/hooks/Ag-Grid/useLocationItemLot";
 import Loader from "@/components/Common/Loader";
-import { useGetLocationItemLotQuery } from "@/redux/services/profileApi";
+import { useGetNavETAQuery } from "@/redux/services/profileApi";
 import { getRowStyle } from "@/utils/gridStyles";
-import { useSelector, useDispatch } from "react-redux";
-import { RootState } from "../../redux/store";
-import { setTouchupsOpen } from "@/redux/slices/tabSlice";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
 
 interface Props {
@@ -20,34 +17,13 @@ interface Props {
   filters?: string;
 }
 
-interface ZPartETAItem {
-  document_no: string;
-  external_document_no: string;
-  no: string;
-  associated_whole_unit: string;
-  description: string;
-  alternative_status: string;
-  customer_no: string;
-  order_date: string;
-  sales_order_aging_days: number;
-  earliest_eta: string;
-  earliest_eta_to_rex: string;
-  earliest_eta_to_unga: string;
-  earliest_eta_to_unnj: string | null;
-  earliest_eta_to_ggtj: string | null;
-  "Days to Earliest ETA": number;
-  "Days to Rex ETA": number;
-  qty: number;
-}
-
-const LocationItemLot = ({ sku }: Props) => {
+const NavETA = ({ sku }: Props) => {
   // Use column preferences hook
-  // LocationItemLot is always nested (requires sku prop), so always disable tab management
   const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
     useColumnPreferences({
-      endpoint: "location_item_lot",
-      tabName: "LocationItemLot",
-      defaultColumns: location_item_lot,
+      endpoint: "nav_eta",
+      tabName: "NavETA",
+      defaultColumns: nav_eta,
       disableTabManagement: false,
       parentTabName: "orders", // Refetch when orders tab is activated
     });
@@ -56,15 +32,12 @@ const LocationItemLot = ({ sku }: Props) => {
   const orderItemsCol = useLocationItemLot(filteredColumns);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
     null
   );
-  const [selectedItemDetail, setSelectedItemDetail] =
-    useState<ZPartETAItem | null>(null);
 
-  //  Fetch filtered ZPart ETA data (based on SKU)
-  const { data, isLoading, isFetching } = useGetLocationItemLotQuery(
+  // Fetch location item lot data (based on SKU)
+  const { data, isLoading, isFetching } = useGetNavETAQuery(
     {
       page,
       page_size: pageSize,
@@ -73,28 +46,23 @@ const LocationItemLot = ({ sku }: Props) => {
     { skip: !sku } // Only fetch if sku is provided
   );
 
-  //  Map the response data to table format
+  // Map response data for AgGridTable
   const rowData = useMemo(() => {
     const items = data?.data || data || [];
     if (!Array.isArray(items)) return [];
 
-    //   return items.map((item: any) => ({
-    //     sku: item.sku,
-    //     parts_item_no: item.parts_item_no,
-    //     parts_item_name: item.parts_item_name,
-    //     parts_item_name_2: item.parts_item_name_2,
-    //     potential_qty_available: item.potential_qty_available,
-    //   }));
-    // }, [data]);
     return items.map((item: any) => ({
       item_no: item.item_no,
-      lot_no: item.lot_no,
+      description: item.description,
       location_code: item.location_code,
       qty: item.qty,
-      lot_test_quality: item.lot_test_quality,
-      blocked: item.blocked,
-      parts_version: item.parts_version,
-      transaction_specification: item.transaction_specification,
+      qty_available: item.qty_available,
+      avail_qty_to_commit: item.avail_qty_to_commit,
+      qty_on_blocked_lot_bin: item.qty_on_blocked_lot_bin,
+      expected_receipt_qty: item.expected_receipt_qty,
+      eta: item.eta,
+      last_inventory_sync_date: item.last_inventory_sync_date,
+      last_inventory_sync_time: item.last_inventory_sync_time,
     }));
   }, [data]);
 
@@ -135,7 +103,7 @@ const LocationItemLot = ({ sku }: Props) => {
           },
         }}
       >
-        Location Item Lot{sku ? `— ${sku}` : ""}
+        NavETA{sku ? ` — ${sku}` : ""}
       </Typography>
 
       {/* Loader or Table */}
@@ -144,8 +112,8 @@ const LocationItemLot = ({ sku }: Props) => {
       ) : rowData.length === 0 ? (
         <Typography color="text.secondary" fontSize={14}>
           {sku
-            ? `No  data found for SKU "${sku}"`
-            : "Please select an SKU to view  data"}
+            ? `No data found for Item No "${sku}"`
+            : "Please select an Item No to view data"}
         </Typography>
       ) : (
         <AgGridTable
@@ -169,4 +137,4 @@ const LocationItemLot = ({ sku }: Props) => {
   );
 };
 
-export default LocationItemLot;
+export default NavETA;

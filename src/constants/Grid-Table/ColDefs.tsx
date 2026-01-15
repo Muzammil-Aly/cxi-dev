@@ -225,30 +225,131 @@ export const orderItems = (
   // },
 ];
 
+// export const location_item_lot = [
+//   {
+//     field: "item_no",
+//     headerName: "Item No",
+//     cellRenderer: CopyCellRenderer,
+//   },
+//   {
+//     field: "parts_item_no",
+//     headerName: "Parts Item No",
+//     cellRenderer: CopyCellRenderer,
+//   },
+//   {
+//     field: "parts_item_name",
+//     headerName: "Parts Item Name",
+//     cellRenderer: CopyCellRenderer,
+//   },
+//   {
+//     field: "parts_item_name_2",
+//     headerName: "Parts Item Name 2",
+//     cellRenderer: CopyCellRenderer,
+//   },
+//   {
+//     field: "potential_qty_available",
+//     headerName: "Potential Qty Available",
+//     cellRenderer: CopyCellRenderer,
+//   },
+// ];
+
 export const location_item_lot = [
   {
-    field: "sku",
-    headerName: "SKU",
+    field: "item_no",
+    headerName: "Item No",
     cellRenderer: CopyCellRenderer,
   },
   {
-    field: "parts_item_no",
-    headerName: "Parts Item No",
+    field: "lot_no",
+    headerName: "Lot No",
     cellRenderer: CopyCellRenderer,
   },
   {
-    field: "parts_item_name",
-    headerName: "Parts Item Name",
+    field: "location_code",
+    headerName: "Location Code",
     cellRenderer: CopyCellRenderer,
   },
   {
-    field: "parts_item_name_2",
-    headerName: "Parts Item Name 2",
+    field: "qty",
+    headerName: "Quantity",
     cellRenderer: CopyCellRenderer,
   },
   {
-    field: "potential_qty_available",
-    headerName: "Potential Qty Available",
+    field: "lot_test_quality",
+    headerName: "Lot Test Quality",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "blocked",
+    headerName: "Blocked",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "parts_version",
+    headerName: "Parts Version",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "transaction_specification",
+    headerName: "Transaction Specification",
+    cellRenderer: CopyCellRenderer,
+  },
+];
+
+export const nav_eta = [
+  {
+    field: "item_no",
+    headerName: "Item No",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "description",
+    headerName: "Description",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "location_code",
+    headerName: "Location Code",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "qty",
+    headerName: "Quantity",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "qty_available",
+    headerName: "Qty Available",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "avail_qty_to_commit",
+    headerName: "Available Qty to Commit",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "qty_on_blocked_lot_bin",
+    headerName: "Qty on Blocked Lot Bin",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "expected_receipt_qty",
+    headerName: "Expected Receipt Qty",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "eta",
+    headerName: "ETA",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "last_inventory_sync_date",
+    headerName: "Last Inventory Sync Date",
+    cellRenderer: CopyCellRenderer,
+  },
+  {
+    field: "last_inventory_sync_time",
+    headerName: "Last Inventory Sync Time",
     cellRenderer: CopyCellRenderer,
   },
 ];

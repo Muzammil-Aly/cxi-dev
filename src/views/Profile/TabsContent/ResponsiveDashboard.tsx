@@ -27,6 +27,7 @@ import { RootState } from "../../../redux/store";
 import "react-grid-layout/css/styles.css";
 import "react-resizable/css/styles.css";
 import LocationItemLot from "../LocationItemLot";
+import NavETA from "../NavETA";
 
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
@@ -215,7 +216,7 @@ const ResponsiveDashboard = ({
         x: 0,
         y: yPosition,
         w: 12,
-        h: 20,
+        h: 30,
         minW: 3,
         minH: 8,
       });
@@ -281,7 +282,9 @@ const ResponsiveDashboard = ({
               cancel=".no-drag .MuiIconButton-root"
               onColumnMoved={onColumnMoved}
               onResetColumns={onResetColumns}
-              storageKey={currentMenu ? `${currentMenu}-columnOrder` : undefined}
+              storageKey={
+                currentMenu ? `${currentMenu}-columnOrder` : undefined
+              }
             />
           </Box>
         </Paper>
@@ -333,7 +336,12 @@ const ResponsiveDashboard = ({
           }}
         >
           {selectedOrderItem && (
-            <LocationItemLot sku={selectedOrderItem?.sku} filters={filters} />
+            <>
+              <LocationItemLot sku={selectedOrderItem?.sku} filters={filters} />
+              <Box sx={{ p: 2, borderRadius: 3, height: "100%" }}>
+                <NavETA sku={selectedOrderItem?.sku} filters={filters} />
+              </Box>
+            </>
           )}
         </Paper>
         {/* ========== TOUCHUPS & TOUCHUP PENS ========== */}
