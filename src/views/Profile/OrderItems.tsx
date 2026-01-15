@@ -57,17 +57,21 @@ const OrderItems = ({
   );
 
   // Generate base columns with handleCellClick
-  const baseColumns = useMemo(() => orderItems(handleCellClick), [handleCellClick]);
+  const baseColumns = useMemo(
+    () => orderItems(handleCellClick),
+    [handleCellClick]
+  );
 
   // Use column preferences hook
   // OrderItems is always nested (requires orderId prop), so always disable tab management
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
-    endpoint: "customer_order_items",
-    tabName: "OrderItems",
-    defaultColumns: baseColumns,
-    disableTabManagement: true,
-    parentTabName: "Orders", // Refetch when Orders tab is activated
-  });
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
+    useColumnPreferences({
+      endpoint: "customer_order_items",
+      tabName: "OrderItems",
+      defaultColumns: baseColumns,
+      // disableTabManagement: true,
+      // parentTabName: "Orders", // Refetch when Orders tab is activated
+    });
 
   const orderItemsCol = useOrderItems(filteredColumns);
   const { isActive, activeTabName, isTouchupsOpen } = useSelector(

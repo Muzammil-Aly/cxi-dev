@@ -134,7 +134,10 @@ export const customerApi = createApi({
         const queryString = searchParams.toString();
         return `/user_prefernce_view${queryString ? `?${queryString}` : ""}`;
       },
-      providesTags: ["UserPreferences"],
+      providesTags: (result, error, arg) => [
+        "UserPreferences",
+        { type: "UserPreferences" as const, id: arg?.endpoint || "all" },
+      ],
     }),
 
     upsertUserPreferences: builder.mutation<any, { data: any[] }>({
@@ -143,7 +146,15 @@ export const customerApi = createApi({
         method: "PATCH",
         body,
       }),
-      // Do not invalidate tags - we handle refetch manually in the hook to avoid unnecessary API calls
+      // Invalidate UserPreferences cache to ensure all components get fresh data
+      // Extract endpoint from first data item to invalidate specific cache
+      invalidatesTags: (result, error, arg) => {
+        const endpoint = arg.data[0]?.endpoint;
+        return [
+          "UserPreferences",
+          { type: "UserPreferences" as const, id: endpoint || "all" },
+        ];
+      },
     }),
   }),
 });

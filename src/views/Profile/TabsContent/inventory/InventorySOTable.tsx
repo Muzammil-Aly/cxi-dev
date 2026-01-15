@@ -68,7 +68,7 @@ const InventorySOTable: React.FC<InventorySOTableProps> = ({
       endpoint: "qty_so_pop_up",
       tabName: "InventorySOTable",
       defaultColumns: sales_orders,
-      disableTabManagement: true,
+      disableTabManagement: false,
       parentTabName: "Inventory",
     });
   const tiCol = useSalesOrders(filteredColumns);

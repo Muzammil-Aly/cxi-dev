@@ -53,20 +53,25 @@ const Touchups = ({
   shouldFilterNull = false,
   setSelectedTouchup,
 }: Props) => {
-  const { isActive, activeTabName, isTouchupPensOpen } = useSelector(
-    (state: RootState) => state.tab
-  );
+  const { isActive, activeTabName, isTouchupPensOpen, isTouchupsOpen } =
+    useSelector((state: RootState) => state.tab);
 
   // Use column preferences hook
   // Disable tab management when used as nested component (lotNo, sku props provided OR shouldFilterNull explicitly set)
   const isNestedComponent = !!lotNo || !!sku || shouldFilterNull === false;
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
-    endpoint: "touchup_part",
-    tabName: "Touchups",
-    defaultColumns: touchups_columns,
-    disableTabManagement: isNestedComponent,
-    parentTabName: isNestedComponent ? "Inventory" : undefined, // Refetch when Inventory tab is activated
-  });
+  const [refetchKey, setRefetchKey] = useState<number>(0);
+
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
+    useColumnPreferences({
+      endpoint: "touchup_part",
+      tabName: "Touchups",
+      defaultColumns: touchups_columns,
+      disableTabManagement: isNestedComponent,
+      parentTabName: isNestedComponent ? ["Inventory", "Orders"] : undefined, // Refetch when Inventory or Orders tab is activated
+      isVisible: isNestedComponent ? isTouchupsOpen : undefined, // Track visibility for nested component
+      // refetchTrigger: isNestedComponent ? lotNo : undefined, // Refetch when lotNo changes
+      refetchTrigger: isNestedComponent ? refetchKey : undefined, // Refetch when refetchKey changes
+    });
 
   const touchupsCol = useTouchupsColumn(filteredColumns);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -165,7 +170,11 @@ const Touchups = ({
         }))
       : [];
   }, [data]);
-
+  useEffect(() => {
+    if (isNestedComponent && isTouchupsOpen) {
+      setRefetchKey((prev) => prev + 1);
+    }
+  }, [isTouchupsOpen, isNestedComponent]);
   // 🔹 Row click handler
   const onRowClicked = (params: any) => {
     const clicked = params.data as Touchup;

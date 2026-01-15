@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -20,6 +20,8 @@ import useTouchupsPens from "@/hooks/Ag-Grid/useTouchupPens";
 import { getRowStyle } from "@/utils/gridStyles";
 import { useGetTouchupPensQuery } from "@/redux/services/profileApi";
 import { useColumnPreferences } from "@/hooks/useColumnPreferences";
+import { useSelector } from "react-redux";
+import { RootState } from "@/redux/store";
 
 interface Props {
   orderId?: string;
@@ -42,16 +44,33 @@ const TouchupsPens: React.FC<Props> = ({
   Colorslug,
   shouldFilterNull = false, // default: show all when Colorslug is null
 }) => {
+  const { isTouchupPensOpen } = useSelector((state: RootState) => state.tab);
+
+  // Track when component opens to trigger preference refetch
+  const [refetchKey, setRefetchKey] = useState<number>(0);
+
   // Use column preferences hook
   // Disable tab management when used as nested component (orderId, Colorslug props provided OR shouldFilterNull explicitly set)
-  const isNestedComponent = !!orderId || !!Colorslug || shouldFilterNull === false;
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
-    endpoint: "touchup_pen",
-    tabName: "TouchupPens",
-    defaultColumns: touchups_pens,
-    disableTabManagement: isNestedComponent,
-    parentTabName: isNestedComponent ? "Inventory" : undefined, // Refetch when Inventory tab is activated
-  });
+
+  const isNestedComponent =
+    !!orderId || !!Colorslug || shouldFilterNull === false;
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
+    useColumnPreferences({
+      endpoint: "touchup_pen",
+      tabName: "TouchupPens",
+      defaultColumns: touchups_pens,
+      disableTabManagement: isNestedComponent,
+      parentTabName: isNestedComponent ? ["Inventory", "Orders"] : undefined, // Refetch when Inventory or Orders tab is activated
+      isVisible: isNestedComponent ? isTouchupPensOpen : undefined, // Track visibility for nested component
+      refetchTrigger: isNestedComponent ? refetchKey : undefined, // Refetch when refetchKey changes
+    });
+
+  // Trigger preference refetch when component opens
+  useEffect(() => {
+    if (isNestedComponent && isTouchupPensOpen) {
+      setRefetchKey((prev) => prev + 1);
+    }
+  }, [isTouchupPensOpen, isNestedComponent]);
 
   // Apply column customization
   const touchupsPenCol = useTouchupsPens(filteredColumns);
