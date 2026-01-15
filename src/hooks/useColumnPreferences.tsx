@@ -160,7 +160,7 @@ export const useColumnPreferences = ({
         // CRITICAL: Skip if we're loading from API (programmatic change, not user action)
         if (isLoadingFromAPIRef.current) {
           console.log(
-            `[${tabName}] ⏭️ Skipping - loading from API, not a user action`
+            `[${tabName}]  Skipping - loading from API, not a user action`
           );
           return;
         }
@@ -176,7 +176,7 @@ export const useColumnPreferences = ({
         // Check if we already processed this exact signature
         if (columnOrderSignature === lastProcessedSignatureRef.current) {
           console.log(
-            `[${tabName}] ⏭️ Skipping - already processed this column order`
+            `[${tabName}]  Skipping - already processed this column order`
           );
           return;
         }
@@ -184,7 +184,7 @@ export const useColumnPreferences = ({
         // Check if this is the same as the last saved order
         if (columnOrderSignature === lastSavedOrderRef.current) {
           console.log(
-            `[${tabName}] ⏭️ Skipping save - column order unchanged from last save`
+            `[${tabName}]  Skipping save - column order unchanged from last save`
           );
           return;
         }
@@ -201,9 +201,7 @@ export const useColumnPreferences = ({
           .filter(Boolean);
 
         setCurrentColumnOrder(newColumnOrder);
-        console.log(
-          `[${tabName}] ✅ Column order updated locally (optimistic)`
-        );
+        console.log(`[${tabName}]  Column order updated locally (optimistic)`);
 
         // Clear any existing timer
         if (columnMoveTimerRef.current) {
@@ -243,14 +241,14 @@ export const useColumnPreferences = ({
             const toastId = toast.loading("Saving column preferences...");
             await upsertUserPreferences(apiPayload).unwrap();
             console.log(
-              `[${tabName}] ✅ Preferences synced with API successfully`
+              `[${tabName}]  Preferences synced with API successfully`
             );
             lastSavedOrderRef.current = columnOrderSignature;
             toast.success("Column preferences saved successfully!", {
               id: toastId,
             });
           } catch (error) {
-            console.error(`[${tabName}] ❌ Failed to sync with API:`, error);
+            console.error(`[${tabName}]  Failed to sync with API:`, error);
             toast.error("Failed to save column preferences. Please try again.");
           } finally {
             setIsSavingPreferences(false);
@@ -366,7 +364,7 @@ export const useColumnPreferences = ({
       const timer = setTimeout(() => {
         isLoadingFromAPIRef.current = false;
         console.log(
-          `[${tabName}] ✅ API preferences loaded - re-enabling column save functionality`
+          `[${tabName}]  API preferences loaded - re-enabling column save functionality`
         );
       }, 1000);
 
@@ -376,7 +374,7 @@ export const useColumnPreferences = ({
 
   // Handle reset to default column order
   const handleResetColumns = useCallback(() => {
-    console.log(`[${tabName}] 🔄 Resetting columns to default order`);
+    console.log(`[${tabName}] Resetting columns to default order`);
 
     // CRITICAL: Set flag to prevent handleColumnMoved from triggering during reset
     isLoadingFromAPIRef.current = true;
@@ -404,7 +402,7 @@ export const useColumnPreferences = ({
       }));
 
       console.log(
-        `[${tabName}] 💾 Resetting preference_sort to defualt_sort:`,
+        `[${tabName}]  Resetting preference_sort to defualt_sort:`,
         defaultPreferencesData
       );
       const newColumnOrder = defaultColumns
@@ -429,7 +427,7 @@ export const useColumnPreferences = ({
         .unwrap()
         .then(() => {
           console.log(
-            `[${tabName}] ✅ Columns reset to default order successfully`
+            `[${tabName}]  Columns reset to default order successfully`
           );
           toast.success("Columns reset to default successfully!", {
             id: toastId,
@@ -438,12 +436,12 @@ export const useColumnPreferences = ({
           setTimeout(() => {
             isLoadingFromAPIRef.current = false;
             console.log(
-              `[${tabName}] ✅ Re-enabled column move handler after reset`
+              `[${tabName}]  Re-enabled column move handler after reset`
             );
           }, 1000);
         })
         .catch((error) => {
-          console.error(`[${tabName}] ❌ Failed to reset to default:`, error);
+          console.error(`[${tabName}]  Failed to reset to default:`, error);
           toast.error("Failed to reset columns. Please try again.", {
             id: toastId,
           });
@@ -452,7 +450,7 @@ export const useColumnPreferences = ({
         });
     } else {
       console.warn(
-        `[${tabName}] ⚠️ No user preferences found to reset. Fetching from API first...`
+        `[${tabName}]  No user preferences found to reset. Fetching from API first...`
       );
       // Re-enable flag if no data
       isLoadingFromAPIRef.current = false;

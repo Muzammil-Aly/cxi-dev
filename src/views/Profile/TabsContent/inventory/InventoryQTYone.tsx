@@ -66,7 +66,7 @@ const InventoryQTYone: React.FC<InventoryQTYone> = ({
       endpoint: "qty_available_pop_up1",
       tabName: "InventoryQTYone",
       defaultColumns: qty_one,
-      disableTabManagement: true,
+      disableTabManagement: false,
       parentTabName: "Inventory",
     });
   // Apply column customization
