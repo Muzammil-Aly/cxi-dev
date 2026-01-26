@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Box, Typography } from "@mui/material";
 import AgGridTable from "@/components/ag-grid";
 import { nav_eta } from "@/constants/Grid-Table/ColDefs";
-import useLocationItemLot from "@/hooks/Ag-Grid/useLocationItemLot";
+// import useLocationItemLot from "@/hooks/Ag-Grid/useLocationItemLot";
+import useNavETA from "@/hooks/Ag-Grid/useNavETA";
 import Loader from "@/components/Common/Loader";
 import { useGetNavETAQuery } from "@/redux/services/profileApi";
 import { getRowStyle } from "@/utils/gridStyles";
@@ -29,11 +30,11 @@ const NavETA = ({ sku }: Props) => {
     });
 
   // Apply column customization
-  const orderItemsCol = useLocationItemLot(filteredColumns);
+  const orderItemsCol = useNavETA(filteredColumns);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
-    null
+    null,
   );
 
   // Fetch location item lot data (based on SKU)
@@ -43,7 +44,7 @@ const NavETA = ({ sku }: Props) => {
       page_size: pageSize,
       sku: sku || "",
     },
-    { skip: !sku } // Only fetch if sku is provided
+    { skip: !sku }, // Only fetch if sku is provided
   );
 
   // Map response data for AgGridTable

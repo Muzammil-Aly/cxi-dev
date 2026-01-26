@@ -58,11 +58,12 @@ import CircularLoader from "@/components/Common/CustomSearch/CircularLoader";
 
 const Orders = ({ customerId }: { customerId?: string }) => {
   // Use column preferences hook
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
-    endpoint: "customer_orders",
-    tabName: "Orders",
-    defaultColumns: orders,
-  });
+  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
+    useColumnPreferences({
+      endpoint: "customer_orders",
+      tabName: "Orders",
+      defaultColumns: orders,
+    });
 
   // Apply column customization
   const orderCol = useOrdersColumn(filteredColumns);
@@ -71,7 +72,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [orderIdFilter, setOrderIdFilter] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [customerNameFilter, setCustomerNameFilter] = useState<
     string | undefined
@@ -83,15 +84,15 @@ const Orders = ({ customerId }: { customerId?: string }) => {
     string | undefined
   >(undefined);
   const [customerNoFilter, setcustomerNoFilter] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [trackigFilter, setTrackingFilter] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [orderIdInput, setOrderIdInput] = useState("");
   const [customerIdInput, setCustomerIdInput] = useState("");
   const [customerIdFilter, setCustomerIdFilter] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [isCustomerIDTyping, setIsCustomerIDTyping] = useState(false);
 
@@ -113,7 +114,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
-    null
+    null,
   );
   const [dateInput, setDateInput] = useState<any>(null);
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
@@ -123,7 +124,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
   const [profitNametyping, setIsProfitNameTyping] = useState(false);
   const [profitNameInput, setProfitNameInput] = useState("");
   const [profitNameFilter, setProfitNameFilter] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [isRetailerNametyping, setIsRetailerNameTyping] = useState(false);
   const [retailerNameInput, setRetailerNameInput] = useState("");
@@ -149,12 +150,12 @@ const Orders = ({ customerId }: { customerId?: string }) => {
     string | undefined
   >(undefined);
   const { isActive, isOrderItemsOpen, activeTabName } = useSelector(
-    (state: RootState) => state.tab
+    (state: RootState) => state.tab,
   );
 
   // Dynamic filter popover state
   const [anchorElFilters, setAnchorElFilters] = useState<null | HTMLElement>(
-    null
+    null,
   );
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
@@ -253,16 +254,15 @@ const Orders = ({ customerId }: { customerId?: string }) => {
       receive: item.receive ?? "N/A",
       redo: Array.isArray(item.redo)
         ? item.redo.join(", ")
-        : item.redo ?? "N/A",
+        : (item.redo ?? "N/A"),
       extend: Array.isArray(item.extend)
         ? item.extend.join(", ")
-        : item.extend ?? "N/A",
+        : (item.extend ?? "N/A"),
       order_url: item.order_url ?? "N/A",
       shipping_zip_code: item.shipping_zip_code || "N/A",
       release_error: item.release_error || "N/A",
       extend_flag: item.extend_flag,
       redo_flag: item.redo_flag,
-      shipping_agent_code: item.shipping_agent_code || "N/A",
     }));
   }, [data]);
 
@@ -363,7 +363,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsOrderIdTyping(false);
       }, 5000),
-    []
+    [],
   );
   const debouncedCustomerId = useMemo(
     () =>
@@ -372,7 +372,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsCustomerIDTyping(false);
       }, 5000),
-    []
+    [],
   );
   const debouncedCustomerName = useMemo(
     () =>
@@ -381,7 +381,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsCustomerNameTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const debouncedProfitName = useMemo(
@@ -391,7 +391,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsProfitNameTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const debouncedRetailerName = useMemo(
@@ -401,7 +401,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsRetailerNameTyping(false);
       }, 5000),
-    []
+    [],
   );
   const debouncedPsiNumber = useMemo(
     () =>
@@ -410,7 +410,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsPsiNumbertyping(false);
       }, 5000),
-    []
+    [],
   );
   const debouncedOrderStatus = useMemo(
     () =>
@@ -419,7 +419,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsOrderStatusTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const debouncedFullfilmentStatus = useMemo(
@@ -429,7 +429,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsFullfillmentTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const debouncedShippingAddress = useMemo(
@@ -439,7 +439,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsShippingAddressTyping(false);
       }, 5000),
-    []
+    [],
   );
   const debouncedCustomerNo = useMemo(
     () =>
@@ -448,7 +448,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsCustomerNoTyping(false);
       }, 5000),
-    []
+    [],
   );
   const debouncedcustomerReferenceNo = useMemo(
     () =>
@@ -457,7 +457,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsCustomerReferenceNoTyping(false);
       }, 5000),
-    []
+    [],
   );
   const debouncedTracking = useMemo(
     () =>
@@ -466,7 +466,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsTrackingTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const debouncedSearch = useMemo(
@@ -476,7 +476,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPage(1);
         setIsTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {

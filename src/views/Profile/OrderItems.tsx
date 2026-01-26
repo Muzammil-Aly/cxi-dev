@@ -53,13 +53,13 @@ const OrderItems = ({
         onCellClick(type, data);
       }
     },
-    [onCellClick]
+    [onCellClick],
   );
 
   // Generate base columns with handleCellClick
   const baseColumns = useMemo(
     () => orderItems(handleCellClick),
-    [handleCellClick]
+    [handleCellClick],
   );
 
   // Use column preferences hook
@@ -75,10 +75,10 @@ const OrderItems = ({
 
   const orderItemsCol = useOrderItems(filteredColumns);
   const { isActive, activeTabName, isTouchupsOpen } = useSelector(
-    (state: RootState) => state.tab
+    (state: RootState) => state.tab,
   );
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
-    null
+    null,
   );
   const [selectedItemDetail, setSelectedItemDetail] =
     useState<OrderItem | null>(null);
@@ -86,7 +86,7 @@ const OrderItems = ({
   // Fetch order items from API using the orderId
   const { data, isLoading, isFetching, refetch } = useGetOrderItemsQuery(
     { orderId },
-    { skip: !orderId }
+    { skip: !orderId },
   );
   const dispatch = useDispatch();
   // Map API data to rowData for AgGrid
@@ -112,6 +112,7 @@ const OrderItems = ({
           earliest_eta_to_rex: item.earliest_eta_to_rex,
           alternative_status: item.alternative_status,
           sales_order_aging_days: item.sales_order_aging_days,
+          shipping_agent_code: item.shipping_agent_code || "N/A",
         }))
       : [];
   }, [data]);

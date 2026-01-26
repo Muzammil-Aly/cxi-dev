@@ -1,10 +1,12 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Box, Button, Typography, Avatar, Popover } from "@mui/material";
+import { Box, Button, Typography, Avatar, Popover, Divider } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
+import HistoryIcon from "@mui/icons-material/History";
 import { useRouter } from "next/navigation";
+import { useLogoutMutation } from "@/redux/services/authApi";
+import UserActivityLog from "./UserActivityLog";
 
 interface SidebarItem {
   key: string;
@@ -27,21 +29,37 @@ const Sidebar: React.FC<SidebarProps> = ({
   const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [logout] = useLogoutMutation();
 
   // Popover state
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [activityLogOpen, setActivityLogOpen] = useState(false);
+
+  // Check if current user is admin (mdb1)
+  const isAdmin = userId === "mdb1";
 
   useEffect(() => {
     const loadUser = () => {
       const storedName = localStorage.getItem("userName");
       const storedEmail = localStorage.getItem("userEmail");
+      const storedUserId = localStorage.getItem("userId");
       setUserName(storedName);
       setUserEmail(storedEmail);
+      setUserId(storedUserId);
     };
 
     loadUser();
     const timer = setTimeout(loadUser, 300);
     return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    // Add event listener for tab/window close
+    window.addEventListener("beforeunload", logoutOnClose);
+
+    return () => {
+      window.removeEventListener("beforeunload", logoutOnClose);
+    };
   }, []);
 
   const handleUserClick = (event: React.MouseEvent<HTMLElement>) => {
@@ -53,6 +71,51 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const open = Boolean(anchorEl);
+  const handleLogout = async () => {
+    try {
+      // const response = await logout(null).unwrap();
+      const response = await logout({
+        refresh_token: localStorage.getItem("refresh_token")!,
+      }).unwrap();
+
+      if (response?.status === 200) {
+        console.log(" Logout success:", response.message);
+      }
+    } catch (err) {
+      console.error(" Logout error:", err);
+    } finally {
+      localStorage.clear();
+      handleClose();
+      router.push("/sign-in");
+    }
+  };
+  // const logoutOnClose = () => {
+  //   const refresh_token = localStorage.getItem("refresh_token");
+  //   if (!refresh_token) return;
+
+  //   const payload = JSON.stringify({ refresh_token });
+
+  //   // Send logout request using navigator.sendBeacon
+  //   navigator.sendBeacon("/auth/logout", payload);
+
+  //   // Clear local storage immediately
+  //   localStorage.clear();
+  // };
+  const logoutOnClose = () => {
+    const refresh_token = localStorage.getItem("refresh_token");
+    if (!refresh_token) return;
+
+    const payload = JSON.stringify({ refresh_token });
+    const blob = new Blob([payload], { type: "application/json" });
+
+    // navigator.sendBeacon("/auth/logout", blob);
+    navigator.sendBeacon(
+      `${process.env.NEXT_PUBLIC_BASE_URL}/auth/logout`,
+      blob,
+    );
+
+    localStorage.clear();
+  };
 
   return (
     <Box
@@ -267,14 +330,51 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             {userName || "Guest User"}
           </Typography>
+          {isAdmin && (
+            <>
+              <Button
+                fullWidth
+                variant="text"
+                onClick={() => {
+                  handleClose();
+                  setActivityLogOpen(true);
+                }}
+                startIcon={<HistoryIcon />}
+                disableRipple
+                disableElevation
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 600,
+                  borderRadius: "8px",
+                  color: "#fff",
+                  justifyContent: "flex-start",
+                  mb: 1,
+                  padding: "8px 16px",
+                  "&:hover": {
+                    bgcolor: "transparent",
+                    transform: "none",
+                    padding: "8px 16px",
+                  },
+                  "&:focus": {
+                    bgcolor: "transparent",
+                    transform: "none",
+                  },
+                  "&:active": {
+                    bgcolor: "transparent",
+                    transform: "none",
+                  },
+                }}
+              >
+                Activity Log
+              </Button>
+              <Divider sx={{ bgcolor: "rgba(255,255,255,0.1)", mb: 1 }} />
+            </>
+          )}
           <Button
             fullWidth
             variant="contained"
             color="error"
-            onClick={() => {
-              handleClose();
-              onLogout();
-            }}
+            onClick={handleLogout}
             startIcon={<LogoutIcon />}
             sx={{
               textTransform: "none",
@@ -287,6 +387,13 @@ const Sidebar: React.FC<SidebarProps> = ({
             Logout
           </Button>
         </Popover>
+
+        {isAdmin && (
+          <UserActivityLog
+            open={activityLogOpen}
+            onClose={() => setActivityLogOpen(false)}
+          />
+        )}
       </Box>
     </Box>
   );

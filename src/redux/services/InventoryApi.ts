@@ -235,13 +235,13 @@ export const inventoryApi = createApi({
         if (life_cycle_status_code !== undefined)
           params.set(
             "life_cycle_status_code",
-            life_cycle_status_code.toString()
+            life_cycle_status_code.toString(),
           );
 
         if (qty_on_blocked_lot_bin !== undefined)
           params.set(
             "qty_on_blocked_lot_bin",
-            qty_on_blocked_lot_bin.toString()
+            qty_on_blocked_lot_bin.toString(),
           );
 
         return `inventory_Availability?${params.toString()}`;
@@ -267,11 +267,48 @@ export const inventoryApi = createApi({
       any,
       { sku: string; page?: number; page_size?: number }
     >({
-      query: ({ sku }) => {
+      query: ({ sku, page = 1, page_size = 10 }) => {
         const params = new URLSearchParams();
+        params.set("page", page.toString());
+        params.set("page_size", page_size.toString());
         if (sku) params.set("item_no", sku);
 
         return `/nav_eta?${params.toString()}`;
+      },
+    }),
+
+    getItemTrackingComments: builder.query<
+      any,
+      {
+        item_no?: string;
+        serial_lot_no?: string;
+        date?: string;
+        comment?: string;
+        comment_2?: string;
+        page?: number;
+        page_size?: number;
+      }
+    >({
+      query: ({
+        item_no,
+        serial_lot_no,
+        date,
+        comment,
+        comment_2,
+        page = 1,
+        page_size = 10,
+      }) => {
+        const params = new URLSearchParams();
+        params.set("page", page.toString());
+        params.set("page_size", page_size.toString());
+
+        if (item_no) params.set("item_no", item_no);
+        if (serial_lot_no) params.set("serial_lot_no", serial_lot_no);
+        if (date) params.set("date", date);
+        if (comment) params.set("comment", comment);
+        if (comment_2) params.set("comment_2", comment_2);
+
+        return `/item_tracking_comments?${params.toString()}`;
       },
     }),
 
@@ -420,4 +457,5 @@ export const {
   useGetTouchupPensQuery,
   useGetLifeCycleStatusQuery,
   useGetNavETAQuery,
+  useGetItemTrackingCommentsQuery,
 } = inventoryApi;

@@ -64,7 +64,14 @@ const useOrderItems = (columns: Column[]) => {
             flex: 1,
             minWidth: 150,
           };
-
+        case "shipping_agent_code":
+          return {
+            ...col,
+            headerName: "Shipping Agent Code",
+            flex: 1,
+            minWidth: 180,
+            cellStyle: { whiteSpace: "normal" },
+          };
         // case "order_id":
         //   return {
         //     ...col,

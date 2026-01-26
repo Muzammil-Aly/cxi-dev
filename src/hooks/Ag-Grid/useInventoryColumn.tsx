@@ -100,10 +100,10 @@ const useInventory = (columns: Column[]) => {
             minWidth: 160,
             cellStyle: { fontSize: "16px" },
           };
-        case "unit_price":
+        case "map_price":
           return {
             ...col,
-            headerName: "Unit Price",
+            headerName: "Map Price",
             flex: 1,
             minWidth: 160,
             cellStyle: { fontSize: "16px" },

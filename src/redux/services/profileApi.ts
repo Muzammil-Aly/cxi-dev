@@ -49,4 +49,5 @@ export {
   useGetTouchupPensQuery,
   useGetLifeCycleStatusQuery,
   useGetNavETAQuery,
+  useGetItemTrackingCommentsQuery,
 } from "./InventoryApi";
