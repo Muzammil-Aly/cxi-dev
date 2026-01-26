@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Box, Button, Typography, Avatar, Popover, Divider } from "@mui/material";
+import {
+  Box,
+  Button,
+  Typography,
+  Avatar,
+  Popover,
+  Divider,
+} from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
 import HistoryIcon from "@mui/icons-material/History";
 import { useRouter } from "next/navigation";
@@ -86,7 +93,8 @@ const Sidebar: React.FC<SidebarProps> = ({
     } finally {
       localStorage.clear();
       handleClose();
-      router.push("/sign-in");
+      // router.push("/sign-in");
+      window.location.href = "/sign-in";
     }
   };
   // const logoutOnClose = () => {
