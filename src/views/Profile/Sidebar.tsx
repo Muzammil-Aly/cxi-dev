@@ -91,10 +91,10 @@ const Sidebar: React.FC<SidebarProps> = ({
     } catch (err) {
       console.error(" Logout error:", err);
     } finally {
+      window.location.href = "/sign-in";
       localStorage.clear();
       handleClose();
       // router.push("/sign-in");
-      window.location.href = "/sign-in";
     }
   };
   // const logoutOnClose = () => {
