@@ -14,6 +14,7 @@ import HistoryIcon from "@mui/icons-material/History";
 import { useRouter } from "next/navigation";
 import { useLogoutMutation } from "@/redux/services/authApi";
 import UserActivityLog from "./UserActivityLog";
+import { clearAuthData } from "@/utils/auth/tokenManager";
 
 interface SidebarItem {
   key: string;
@@ -79,23 +80,28 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   const open = Boolean(anchorEl);
   const handleLogout = async () => {
-    try {
-      // const response = await logout(null).unwrap();
-      const response = await logout({
-        refresh_token: localStorage.getItem("refresh_token")!,
-      }).unwrap();
+    const refreshToken = localStorage.getItem("refresh_token");
 
-      if (response?.status === 200) {
-        console.log(" Logout success:", response.message);
+    // Clear auth data first (cookies + localStorage) before redirecting
+    clearAuthData();
+    handleClose();
+
+    try {
+      if (refreshToken) {
+        const response = await logout({
+          refresh_token: refreshToken,
+        }).unwrap();
+
+        if (response?.status === 200) {
+          console.log(" Logout success:", response.message);
+        }
       }
     } catch (err) {
       console.error(" Logout error:", err);
-    } finally {
-      window.location.href = "/sign-in";
-      localStorage.clear();
-      handleClose();
-      // router.push("/sign-in");
     }
+
+    // Redirect after clearing auth data
+    window.location.href = "/sign-in";
   };
   // const logoutOnClose = () => {
   //   const refresh_token = localStorage.getItem("refresh_token");
@@ -122,7 +128,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       blob,
     );
 
-    localStorage.clear();
+    clearAuthData();
   };
 
   return (
