@@ -62,11 +62,53 @@ const Sidebar: React.FC<SidebarProps> = ({
     return () => clearTimeout(timer);
   }, []);
   useEffect(() => {
-    // Add event listener for tab/window close
-    window.addEventListener("beforeunload", logoutOnClose);
+    // Check if this is a refresh (marker persists) vs new tab (marker cleared)
+    const wasRefreshing = sessionStorage.getItem("is_refreshing");
+    const hadActiveSession = localStorage.getItem("had_active_session");
+
+    if (wasRefreshing) {
+      // This was a refresh, not a tab close - clear the marker, keep user logged in
+      sessionStorage.removeItem("is_refreshing");
+    } else if (hadActiveSession && !sessionStorage.getItem("session_active")) {
+      // Had a session before, but sessionStorage is fresh = tab was closed and reopened
+      // Clear auth data and redirect to sign-in
+      localStorage.removeItem("had_active_session");
+      clearAuthData();
+      window.location.href = "/sign-in";
+      return;
+    }
+
+    // Mark session as active in both storages
+    sessionStorage.setItem("session_active", "true");
+    localStorage.setItem("had_active_session", "true");
+
+    const handleBeforeUnload = () => {
+      // Set a marker before unload - will persist if refresh, cleared if tab close
+      sessionStorage.setItem("is_refreshing", "true");
+
+      // Call logout API using fetch with keepalive (works reliably during page unload)
+      const refreshToken = localStorage.getItem("refresh_token");
+      const accessToken = localStorage.getItem("access_token");
+      if (refreshToken) {
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+        const logoutUrl = `${baseUrl}/auth/logout`;
+
+        fetch(logoutUrl, {
+          method: "POST",
+          body: JSON.stringify({ refresh_token: refreshToken }),
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`,
+          },
+          keepalive: true,
+        });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      window.removeEventListener("beforeunload", logoutOnClose);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, []);
 
@@ -82,7 +124,10 @@ const Sidebar: React.FC<SidebarProps> = ({
   const handleLogout = async () => {
     const refreshToken = localStorage.getItem("refresh_token");
 
-    // Clear auth data first (cookies + localStorage) before redirecting
+    // Clear session markers and auth data before redirecting
+    localStorage.removeItem("had_active_session");
+    sessionStorage.removeItem("session_active");
+    sessionStorage.removeItem("is_refreshing");
     clearAuthData();
     handleClose();
 
@@ -102,33 +147,6 @@ const Sidebar: React.FC<SidebarProps> = ({
 
     // Redirect after clearing auth data
     window.location.href = "/sign-in";
-  };
-  // const logoutOnClose = () => {
-  //   const refresh_token = localStorage.getItem("refresh_token");
-  //   if (!refresh_token) return;
-
-  //   const payload = JSON.stringify({ refresh_token });
-
-  //   // Send logout request using navigator.sendBeacon
-  //   navigator.sendBeacon("/auth/logout", payload);
-
-  //   // Clear local storage immediately
-  //   localStorage.clear();
-  // };
-  const logoutOnClose = () => {
-    const refresh_token = localStorage.getItem("refresh_token");
-    if (!refresh_token) return;
-
-    const payload = JSON.stringify({ refresh_token });
-    const blob = new Blob([payload], { type: "application/json" });
-
-    // navigator.sendBeacon("/auth/logout", blob);
-    navigator.sendBeacon(
-      `${process.env.NEXT_PUBLIC_BASE_URL}/auth/logout`,
-      blob,
-    );
-
-    clearAuthData();
   };
 
   return (
