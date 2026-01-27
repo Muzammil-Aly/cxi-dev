@@ -367,6 +367,7 @@ const ResponsiveDashboard = ({
               <ItemTrackingComments
                 sku={selectedOrderItem.sku}
                 lotNo={selectedOrderItem.lot_no}
+                shouldFilterNull
               />
               {isTouchupPensOpen && selectedTouchup && (
                 <Box sx={{ p: 2, borderRadius: 3, height: "100%" }}>

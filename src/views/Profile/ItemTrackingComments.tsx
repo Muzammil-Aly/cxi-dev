@@ -29,9 +29,14 @@ interface Props {
   setSelectedOrderItem?: React.Dispatch<React.SetStateAction<any | null>>;
   orderItemSec?: boolean;
   filters?: string;
+  shouldFilterNull?: boolean;
 }
 
-const ItemTrackingComments = ({ sku, lotNo }: Props) => {
+const ItemTrackingComments = ({
+  sku,
+  lotNo,
+  shouldFilterNull = false,
+}: Props) => {
   const isNestedComponent = !!lotNo || !!sku;
   const [refetchKey, setRefetchKey] = useState<number>(0);
   const { isActive, activeTabName, isTouchupPensOpen, isTouchupsOpen } =
@@ -199,7 +204,7 @@ const ItemTrackingComments = ({ sku, lotNo }: Props) => {
       />
     </FormControl>
   );
-  if (!lotNo) {
+  if (!lotNo && shouldFilterNull) {
     return (
       <Box
         display="flex"
@@ -207,6 +212,7 @@ const ItemTrackingComments = ({ sku, lotNo }: Props) => {
         alignItems="center"
         justifyContent="center"
         height={320}
+        mt={10}
         sx={{
           background: "linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%)",
           borderRadius: "16px",
@@ -260,8 +266,8 @@ const ItemTrackingComments = ({ sku, lotNo }: Props) => {
             lineHeight: 1.5,
           }}
         >
-          Please select or provide a valid <strong>Lot No</strong> to view
-          touchup details.
+          Please select or provide a valid <strong>Lot No</strong> to view Item
+          Tracking Comments.
         </Typography>
       </Box>
     );
