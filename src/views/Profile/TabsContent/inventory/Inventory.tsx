@@ -119,6 +119,7 @@ const Inventory = () => {
           map_price: item.map_price,
           qty_on_inspecting_lot: item.qty_on_inspecting_lot,
           expected_receipt_qty: item.expected_receipt_qty,
+          current_vendor: item.current_vendor,
         }))
       : [];
   }, [data]);

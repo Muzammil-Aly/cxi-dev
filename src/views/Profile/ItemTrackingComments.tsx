@@ -106,9 +106,11 @@ const ItemTrackingComments = ({ sku, lotNo }: Props) => {
   const queryParams = {
     page,
     page_size: pageSizeInput,
-    item_no: filters.item_no || sku || undefined,
-    serial_lot_no: filters.serial_lot_no || lotNo || undefined,
-    transaction_specification: filters.transaction_specification || undefined,
+    item_no: filters.item_no ? filters.item_no : sku,
+    serial_lot_no: filters.serial_lot_no ? filters.serial_lot_no : lotNo,
+    transaction_specification: filters.transaction_specification
+      ? filters.transaction_specification
+      : undefined,
   };
 
   const { data, isLoading, isFetching } =
@@ -197,7 +199,73 @@ const ItemTrackingComments = ({ sku, lotNo }: Props) => {
       />
     </FormControl>
   );
+  if (!lotNo) {
+    return (
+      <Box
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+        justifyContent="center"
+        height={320}
+        sx={{
+          background: "linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%)",
+          borderRadius: "16px",
+          border: "1px dashed #c7c7c7",
+          boxShadow: "inset 0 1px 4px rgba(0,0,0,0.05)",
+          transition: "all 0.3s ease-in-out",
+          "&:hover": {
+            background: "linear-gradient(180deg, #fdfdfd 0%, #f5f5f5 100%)",
+            borderColor: "#b0b0b0",
+          },
+        }}
+      >
+        <Box
+          sx={{
+            width: 60,
+            height: 60,
+            borderRadius: "50%",
+            backgroundColor: "#e3f2fd",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            mb: 2,
+          }}
+        >
+          <Typography
+            variant="h5"
+            sx={{ color: "#1976d2", fontWeight: 700, letterSpacing: "1px" }}
+          >
+            ℹ️
+          </Typography>
+        </Box>
 
+        <Typography
+          variant="h6"
+          sx={{
+            color: "#424242",
+            fontWeight: 600,
+            mb: 0.5,
+            letterSpacing: "0.5px",
+          }}
+        >
+          No Lot Number Found
+        </Typography>
+
+        <Typography
+          variant="body2"
+          sx={{
+            color: "#757575",
+            maxWidth: 300,
+            textAlign: "center",
+            lineHeight: 1.5,
+          }}
+        >
+          Please select or provide a valid <strong>Lot No</strong> to view
+          touchup details.
+        </Typography>
+      </Box>
+    );
+  }
   return (
     <Box display="flex" flexDirection="column" width="100%" gap={2}>
       {/* Header */}
@@ -229,7 +297,7 @@ const ItemTrackingComments = ({ sku, lotNo }: Props) => {
             },
           }}
         >
-          Item Tracking Comments{sku ? ` — ${sku}` : ""}
+          Item Tracking Comments
         </Typography>
 
         {/* Filters */}
@@ -285,8 +353,8 @@ const ItemTrackingComments = ({ sku, lotNo }: Props) => {
       ) : rowData.length === 0 ? (
         <Typography color="text.secondary" fontSize={14}>
           {sku
-            ? `No data found for Item No "${sku}"`
-            : "Please select an Item No to view data"}
+            ? `No data found for Item No "${sku}" and lot no "${lotNo}"`
+            : `Please select an Item  to view data`}
         </Typography>
       ) : (
         <AgGridTable

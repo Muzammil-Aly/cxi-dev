@@ -80,6 +80,20 @@ const usePurchaseOrders = (columns: Column[]) => {
             flex: 1,
             minWidth: 200,
           };
+        case "buy_from_vendor_code":
+          return {
+            ...col,
+            headerName: "Buy From Vendor Code",
+            flex: 1,
+            minWidth: 200,
+          };
+        case "document_no":
+          return {
+            ...col,
+            headerName: "Document No",
+            flex: 1,
+            minWidth: 200,
+          };
         default:
           return col;
       }

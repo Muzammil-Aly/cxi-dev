@@ -149,6 +149,17 @@ const Orders = ({ customerId }: { customerId?: string }) => {
   const [psiNumberStatusFilter, setPsiNumberFilter] = useState<
     string | undefined
   >(undefined);
+  const [isPhoneNumbertyping, setIsPhoneNumberTyping] = useState(false);
+  const [phoneNumberInput, setPhoneNumberInput] = useState("");
+
+  const [phoneNumberStatusFilter, setPhoneNumberFilter] = useState<
+    string | undefined
+  >(undefined);
+  const [yourReferenceInput, setYourReferenceInput] = useState("");
+  const [yourReferenceFilter, setYourReferenceFilter] = useState<
+    string | undefined
+  >(undefined);
+  const [isYourReferenceTyping, setIsYourReferenceTyping] = useState(false);
   const { isActive, isOrderItemsOpen, activeTabName } = useSelector(
     (state: RootState) => state.tab,
   );
@@ -176,6 +187,8 @@ const Orders = ({ customerId }: { customerId?: string }) => {
       type: "dropdown",
     },
     { key: "psiNumber", label: "PSI Number", type: "input" },
+    { key: "phone_no", label: "Phone No", type: "input" },
+    { key: "your_reference", label: "Your Reference", type: "input" },
   ];
 
   const { data, isLoading, isFetching } = useGetCustomerOrdersQuery({
@@ -195,6 +208,8 @@ const Orders = ({ customerId }: { customerId?: string }) => {
     fulfillment_status: FullfillmentFilter || undefined,
     order_status: OrderStatusFilter || undefined,
     psi_number: psiNumberStatusFilter || undefined,
+    phone_no: phoneNumberStatusFilter || undefined,
+    your_reference: yourReferenceFilter || undefined,
   });
 
   const {
@@ -263,6 +278,10 @@ const Orders = ({ customerId }: { customerId?: string }) => {
       release_error: item.release_error || "N/A",
       extend_flag: item.extend_flag,
       redo_flag: item.redo_flag,
+      your_reference: item.your_reference || "N/A",
+      ship_to_address: item.ship_to_address || "N/A",
+      ship_to_address_2: item.ship_to_address_2 || "N/A",
+      ship_to_city: item.ship_to_city || "N/A",
     }));
   }, [data]);
 
@@ -284,6 +303,8 @@ const Orders = ({ customerId }: { customerId?: string }) => {
     psiNumberStatusFilter,
     searchTerm,
     customerNoFilter,
+    phoneNumberStatusFilter,
+    yourReferenceFilter,
   ]);
 
   // Auto-select first order when search/filter results load
@@ -303,6 +324,8 @@ const Orders = ({ customerId }: { customerId?: string }) => {
       FullfillmentFilter ||
       OrderStatusFilter ||
       psiNumberStatusFilter ||
+      phoneNumberStatusFilter ||
+      yourReferenceFilter ||
       searchTerm;
 
     // When data updates and filters are active
@@ -324,6 +347,8 @@ const Orders = ({ customerId }: { customerId?: string }) => {
     FullfillmentFilter,
     OrderStatusFilter,
     psiNumberStatusFilter,
+    phoneNumberStatusFilter,
+    yourReferenceFilter,
     searchTerm,
   ]);
 
@@ -409,6 +434,24 @@ const Orders = ({ customerId }: { customerId?: string }) => {
         setPsiNumberFilter(value || undefined);
         setPage(1);
         setIsPsiNumbertyping(false);
+      }, 5000),
+    [],
+  );
+  const debouncedPhoneNo = useMemo(
+    () =>
+      debounce((value: string) => {
+        setPhoneNumberFilter(value || undefined);
+        setPage(1);
+        setIsPhoneNumberTyping(false);
+      }, 5000),
+    [],
+  );
+  const debouncedYourReference = useMemo(
+    () =>
+      debounce((value: string) => {
+        setYourReferenceFilter(value || undefined);
+        setPage(1);
+        setIsYourReferenceTyping(false);
       }, 5000),
     [],
   );
@@ -550,6 +593,18 @@ const Orders = ({ customerId }: { customerId?: string }) => {
           setPsiNumberFilter(undefined);
           setIsPsiNumbertyping(false);
           break;
+        case "phone_no":
+          setPhoneNumberFilter(undefined);
+          setPhoneNumberInput("");
+          setIsPhoneNumberTyping(false);
+          break;
+
+        case "your_reference":
+          setYourReferenceFilter(undefined);
+          setYourReferenceInput("");
+          setIsYourReferenceTyping(false);
+          break;
+
         default:
           break;
       }
@@ -846,6 +901,34 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                           setFilter={setPsiNumberFilter}
                           debouncedFunction={debouncedPsiNumber}
                           loading={isPsiNumbertyping}
+                          width={180}
+                        />
+                      )}
+                      {f.key === "phone_no" && (
+                        <SearchInput
+                          label="Phone Number"
+                          value={phoneNumberInput}
+                          setValue={(val) => {
+                            setPhoneNumberInput(val);
+                            setIsPhoneNumberTyping(true);
+                          }}
+                          setFilter={setPhoneNumberFilter}
+                          debouncedFunction={debouncedPhoneNo}
+                          loading={isPhoneNumbertyping}
+                          width={180}
+                        />
+                      )}
+                      {f.key === "your_reference" && (
+                        <SearchInput
+                          label="Your Reference"
+                          value={yourReferenceInput}
+                          setValue={(val) => {
+                            setYourReferenceInput(val);
+                            setIsYourReferenceTyping(true);
+                          }}
+                          setFilter={setYourReferenceFilter}
+                          debouncedFunction={debouncedYourReference}
+                          loading={isYourReferenceTyping}
                           width={180}
                         />
                       )}

@@ -155,6 +155,15 @@ const useOrdersColumn = (columns: Column[]) => {
         case "channel":
           return { ...col, headerName: "Channel", minWidth: 140 };
 
+        case "your_reference":
+          return { ...col, headerName: "Your Reference", minWidth: 140 };
+        case "ship_to_address_2":
+          return { ...col, headerName: "Ship To Address 2", minWidth: 180 };
+        case "ship_to_address":
+          return { ...col, headerName: "Ship To Address", minWidth: 180 };
+
+        case "ship_to_city":
+          return { ...col, headerName: "Ship To City", minWidth: 140 };
         default:
           return col;
       }

@@ -112,6 +112,8 @@ const InventoryPOTable: React.FC<InventoryPOTableProps> = ({
           expected_receipt_date: item.expected_receipt_date ?? "-",
           shipment_status: item.shipment_status ?? "-",
           qty_on_po: item.qty_on_po != null ? item.qty_on_po : 0,
+          buy_from_vendor_code: item.buy_from_vendor_code ?? "-",
+          document_no: item.document_no ?? "-",
         }))
       : [];
   }, [data]);
