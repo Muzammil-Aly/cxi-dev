@@ -35,7 +35,7 @@ const useItemTrackingComments = (columns: Column[]) => {
             ...col,
             headerName: "Parts Version",
             flex: 1,
-            minWidth: 120,
+            minWidth: 140,
           };
 
         case "transaction_specification":
@@ -43,7 +43,7 @@ const useItemTrackingComments = (columns: Column[]) => {
             ...col,
             headerName: "Transaction Specification",
             flex: 1.2,
-            minWidth: 180,
+            minWidth: 220,
           };
 
         case "date":
@@ -83,7 +83,7 @@ const useItemTrackingComments = (columns: Column[]) => {
             ...col,
             headerName: "Test Quality",
             flex: 1,
-            minWidth: 120,
+            minWidth: 160,
           };
 
         case "country_region_of_origin_code":
@@ -91,7 +91,7 @@ const useItemTrackingComments = (columns: Column[]) => {
             ...col,
             headerName: "Country/Region of Origin",
             flex: 1.2,
-            minWidth: 180,
+            minWidth: 250,
           };
 
         default:

@@ -86,7 +86,7 @@ const useTouchupsColumn = (columns: Column[]) => {
             ...col,
             headerName: "Potential Qty Available",
             flex: 1,
-            minWidth: 150,
+            minWidth: 220,
           };
         default:
           return col;

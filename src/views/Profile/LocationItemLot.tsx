@@ -58,7 +58,7 @@ const LocationItemLot = ({ sku }: Props) => {
   const [pageSize, setPageSize] = useState(10);
 
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
-    null
+    null,
   );
   const [selectedItemDetail, setSelectedItemDetail] =
     useState<ZPartETAItem | null>(null);
@@ -70,7 +70,7 @@ const LocationItemLot = ({ sku }: Props) => {
       page_size: pageSize,
       sku: sku || "",
     },
-    { skip: !sku } // Only fetch if sku is provided
+    { skip: !sku }, // Only fetch if sku is provided
   );
 
   //  Map the response data to table format

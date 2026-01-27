@@ -27,7 +27,7 @@ const useNavETA = (columns: Column[]) => {
             ...col,
             headerName: "Description",
             flex: 1.5,
-            minWidth: 200,
+            minWidth: 250,
           };
 
         case "location_code":
@@ -35,7 +35,7 @@ const useNavETA = (columns: Column[]) => {
             ...col,
             headerName: "Location Code",
             flex: 1,
-            minWidth: 140,
+            minWidth: 180,
           };
 
         case "eta":
@@ -69,7 +69,7 @@ const useNavETA = (columns: Column[]) => {
             ...col,
             headerName: "Available Qty to Commit",
             flex: 1,
-            minWidth: 180,
+            minWidth: 220,
             cellStyle: { textAlign: "right", fontWeight: 600 },
           };
 
@@ -87,7 +87,7 @@ const useNavETA = (columns: Column[]) => {
             ...col,
             headerName: "Expected Receipt Qty",
             flex: 1,
-            minWidth: 180,
+            minWidth: 220,
             cellStyle: { textAlign: "right", fontWeight: 600 },
           };
 
@@ -96,7 +96,7 @@ const useNavETA = (columns: Column[]) => {
             ...col,
             headerName: "Last Inventory Sync Date",
             flex: 1.2,
-            minWidth: 200,
+            minWidth: 220,
           };
 
         case "last_inventory_sync_time":
@@ -104,7 +104,7 @@ const useNavETA = (columns: Column[]) => {
             ...col,
             headerName: "Last Inventory Sync Time",
             flex: 1.2,
-            minWidth: 180,
+            minWidth: 220,
           };
 
         default:

@@ -45,7 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [activityLogOpen, setActivityLogOpen] = useState(false);
 
   // Check if current user is admin (mdb1)
-  const isAdmin = userId === "mdb1";
+  const isAdmin = userId === "mdb0";
 
   useEffect(() => {
     const loadUser = () => {
@@ -98,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           body: JSON.stringify({ refresh_token: refreshToken }),
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           keepalive: true,
         });

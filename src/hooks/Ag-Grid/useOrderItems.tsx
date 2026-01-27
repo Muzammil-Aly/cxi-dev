@@ -69,7 +69,7 @@ const useOrderItems = (columns: Column[]) => {
             ...col,
             headerName: "Shipping Agent Code",
             flex: 1,
-            minWidth: 180,
+            minWidth: 210,
             cellStyle: { whiteSpace: "normal" },
           };
         // case "order_id":
@@ -135,7 +135,13 @@ const useOrderItems = (columns: Column[]) => {
             flex: 1,
             minWidth: 140,
           };
-
+        case "fulfillment_status":
+          return {
+            ...col,
+            headerName: "Fullfillment Status",
+            flex: 1,
+            minWidth: 180,
+          };
         case "quantity":
           return {
             ...col,
@@ -170,7 +176,7 @@ const useOrderItems = (columns: Column[]) => {
             ...col,
             headerName: "Earliest ETA",
             flex: 1,
-            minWidth: 150,
+            minWidth: 200,
           };
         case "earliest_eta_to_rex":
           return {
@@ -184,14 +190,14 @@ const useOrderItems = (columns: Column[]) => {
             ...col,
             headerName: "Alternative Status",
             flex: 1,
-            minWidth: 150,
+            minWidth: 180,
           };
         case "sales_order_aging_days":
           return {
             ...col,
             headerName: "Sales Order Aging Days",
             flex: 1,
-            minWidth: 150,
+            minWidth: 220,
           };
         default:
           return { ...col, flex: 1, minWidth: 120 };
