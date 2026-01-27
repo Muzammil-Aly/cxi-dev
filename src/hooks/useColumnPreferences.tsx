@@ -138,7 +138,7 @@ export const useColumnPreferences = ({
 
       // Filter columns that exist in preferences and sort by preference_sort
       const orderedColumns = defaultColumns
-        .filter((col) => preferenceMap.has(col.field))
+        .filter((col) => col && preferenceMap.has(col.field))
         .sort((a, b) => {
           const sortA = (preferenceMap.get(a.field) as number) || 999;
           const sortB = (preferenceMap.get(b.field) as number) || 999;
@@ -214,7 +214,7 @@ export const useColumnPreferences = ({
         const newColumnOrder = columnState
           .filter((col: any) => col.colId)
           .map((col: any) => {
-            return defaultColumns.find((column) => column.field === col.colId);
+            return defaultColumns.find((column) => column?.field === col.colId);
           })
           .filter(Boolean);
 
@@ -709,7 +709,7 @@ export const useColumnPreferences = ({
       );
       const newColumnOrder = defaultColumns
         .filter((col) =>
-          defaultPreferencesData.find(
+          col && defaultPreferencesData.find(
             (pref: any) => pref.preference === col.field
           )
         )

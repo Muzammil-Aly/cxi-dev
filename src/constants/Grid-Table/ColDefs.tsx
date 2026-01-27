@@ -136,7 +136,6 @@ export const orders = [
     headerName: "Customer ID",
     cellRenderer: CopyCellRenderer,
   },
-  ,
   {
     field: "your_reference",
     headerName: "Your Reference",
