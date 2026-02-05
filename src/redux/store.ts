@@ -8,6 +8,7 @@ import { orderApi } from "./services/orderApi";
 import { supportApi } from "./services/supportApi";
 import { eventsApi } from "./services/eventsApi";
 import { authApi } from "./services/authApi";
+import { PreferencesApi } from "./services/preferencesApi";
 import tabReducer from "./slices/tabSlice";
 export const store = configureStore({
   reducer: {
@@ -22,6 +23,7 @@ export const store = configureStore({
     [eventsApi.reducerPath]: eventsApi.reducer,
     [inventoryApi.reducerPath]: inventoryApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
+    [PreferencesApi.reducerPath]: PreferencesApi.reducer,
     tab: tabReducer,
   },
   middleware: (getDefaultMiddleware) =>
@@ -36,6 +38,7 @@ export const store = configureStore({
       .concat(supportApi.middleware)
       .concat(eventsApi.middleware)
       .concat(inventoryApi.middleware)
+      .concat(PreferencesApi.middleware)
       .concat(authApi.middleware),
 });
 

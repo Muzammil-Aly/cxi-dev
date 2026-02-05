@@ -116,6 +116,7 @@ const ItemTrackingComments = ({
     transaction_specification: filters.transaction_specification
       ? filters.transaction_specification
       : undefined,
+    isFromProps: !filters.item_no && !!sku, // true when using sku prop, false when searching
   };
 
   const { data, isLoading, isFetching } =
@@ -149,7 +150,7 @@ const ItemTrackingComments = ({
 
   // 🔹 Render input filter
   const renderFilter = (label: string, key: keyof typeof filters) => (
-    <FormControl sx={{ width: 150 }}>
+    <FormControl sx={{ width: 160 }}>
       <TextField
         value={inputs[key].toUpperCase()}
         onChange={(e) => {
@@ -356,12 +357,6 @@ const ItemTrackingComments = ({
       {/* Table */}
       {isLoading || isFetching ? (
         <Loader />
-      ) : rowData.length === 0 ? (
-        <Typography color="text.secondary" fontSize={14}>
-          {sku
-            ? `No data found for Item No "${sku}" and lot no "${lotNo}"`
-            : `Please select an Item  to view data`}
-        </Typography>
       ) : (
         <AgGridTable
           rowData={rowData}

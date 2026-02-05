@@ -99,6 +99,13 @@ const useOrdersColumn = (columns: Column[]) => {
           return { ...col, headerName: "Redo", flex: 1, minWidth: 140 };
         case "order_url":
           return { ...col, headerName: "Order URL", flex: 1, minWidth: 140 };
+        case "location_code":
+          return {
+            ...col,
+            headerName: "Location Code",
+            flex: 1,
+            minWidth: 170,
+          };
 
         case "shipping_zip_code":
           return {

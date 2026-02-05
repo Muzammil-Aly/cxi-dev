@@ -189,7 +189,7 @@ export class SessionManager {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ refresh_token: refresh }),
-        }
+        },
       );
 
       if (!response.ok) {
@@ -221,12 +221,43 @@ export class SessionManager {
   /**
    * Handle session expiration
    */
-  private handleSessionExpired() {
+  // private handleSessionExpired() {
+  //   this.cleanup();
+  //   clearAuthData();
+  //   if (this.onLogout) {
+  //     this.onLogout();
+  //   }
+  // }
+  /**
+   * Handle session expiration
+   */
+  private async handleSessionExpired() {
     this.cleanup();
+
+    try {
+      const accessToken = getAccessToken();
+      const refreshToken = getRefreshToken();
+      if (refreshToken) {
+        await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/auth/logout`, {
+          method: "POST",
+          body: JSON.stringify({ refresh_token: refreshToken }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${refreshToken}`,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Logout API failed:", error);
+    }
+
     clearAuthData();
+
     if (this.onLogout) {
       this.onLogout();
     }
+
+    console.log("User logged out due to inactivity");
   }
 
   /**

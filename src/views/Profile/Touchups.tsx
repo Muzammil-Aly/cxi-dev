@@ -146,6 +146,7 @@ const Touchups = ({
       : shouldFilterNull
         ? { lot_no: "null" } // filter for null lots only
         : {}),
+    isFromProps: !filters.lot_no && !!lotNo, // true when using lotno prop, false when searching
   };
 
   const { data, isLoading, isFetching } = useGetTouchupsQuery(queryParams);

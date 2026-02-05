@@ -108,7 +108,11 @@ const OrderItems = ({
           bol_no: item.bol_no,
           amount: item.amount,
           lot_no: item.lot_no,
-          earliest_eta: item.earliest_eta,
+          // earliest_eta: item.earliest_eta,
+          earliest_eta: item.earliest_eta
+            ? item.earliest_eta.split("T")[0]
+            : "N/A",
+
           earliest_eta_to_rex: item.earliest_eta_to_rex,
           alternative_status: item.alternative_status,
           sales_order_aging_days: item.sales_order_aging_days,

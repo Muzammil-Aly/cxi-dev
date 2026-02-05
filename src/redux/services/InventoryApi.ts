@@ -283,12 +283,14 @@ export const inventoryApi = createApi({
         item_no?: string;
         // serial_lot_no?: string;
         serial_lot_no?: string | null;
+        transaction_specification?: string;
 
         date?: string;
         comment?: string;
         comment_2?: string;
         page?: number;
         page_size?: number;
+        isFromProps?: boolean;
       }
     >({
       query: ({
@@ -297,20 +299,29 @@ export const inventoryApi = createApi({
         date,
         comment,
         comment_2,
+        transaction_specification,
         page = 1,
         page_size = 10,
+        isFromProps = false,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
 
-        if (item_no) params.set("item_no", item_no);
+        if (item_no)
+          params.set("item_no", isFromProps ? item_no : `like:${item_no}`);
         if (serial_lot_no !== undefined)
-          params.set("lot_no", serial_lot_no ?? "null");
+          params.set(
+            "lot_no",
+            (isFromProps ? serial_lot_no : `like:${serial_lot_no}`) ?? "null",
+          );
+        // if (serial_lot_no !== undefined)
+        //   params.set("lot_no", serial_lot_no ?? "null");
         if (date) params.set("date", date);
         if (comment) params.set("comment", comment);
         if (comment_2) params.set("comment_2", comment_2);
-
+        if (transaction_specification)
+          params.set("transaction_specification", transaction_specification);
         return `/item_tracking_comments?${params.toString()}`;
       },
     }),
@@ -333,6 +344,7 @@ export const inventoryApi = createApi({
         color_slug?: string;
         color_name?: string;
         parts_version?: string;
+        isFromProps?: boolean;
       }
     >({
       query: ({
@@ -351,14 +363,18 @@ export const inventoryApi = createApi({
         color_slug,
         color_name,
         parts_version,
+        isFromProps = false,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
         if (order_id) params.set("order_id", order_id);
         // if (lot_no !== undefined) params.set("lot_no", lot_no ?? "");
-        if (lot_no) params.set("lot_no", lot_no);
-        if (sku) params.set("sku", sku);
+        // if (lot_no) params.set("lot_no", lot_no);
+        if (lot_no)
+          params.set("lot_no", isFromProps ? lot_no : `like:${lot_no}`);
+        // if (sku) params.set("sku", sku);
+        if (sku) params.set("sku", isFromProps ? sku : `like:${sku}`);
         if (customer_id) params.set("customer_id", customer_id);
         if (parts_item_no) params.set("parts_item_no", parts_item_no);
         if (parts_item_name) params.set("parts_item_name", parts_item_name);
@@ -389,6 +405,7 @@ export const inventoryApi = createApi({
         color_name?: string;
         sku?: string;
         QtyAvailable?: string;
+        isFromProps?: boolean;
       }
     >({
       query: ({
@@ -401,12 +418,18 @@ export const inventoryApi = createApi({
         color_name,
         sku,
         QtyAvailable,
+        isFromProps = false,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
 
-        if (color_slug) params.set("Colorslug", color_slug);
+        // if (color_slug) params.set("Colorslug", color_slug);
+        if (color_slug)
+          params.set(
+            "Colorslug",
+            isFromProps ? color_slug : `like:${color_slug}`,
+          );
         if (item_num) params.set("item_num", item_num);
         if (item_name) params.set("item_name", item_name);
         if (item_name2) params.set("ItemName2", item_name2);

@@ -157,6 +157,11 @@ export const orders = [
     headerName: "Ship To City",
     cellRenderer: CopyCellRenderer,
   },
+  {
+    field: "location_code",
+    headerName: "Location Code",
+    cellRenderer: CopyCellRenderer,
+  },
 ];
 
 export const orderItems = (

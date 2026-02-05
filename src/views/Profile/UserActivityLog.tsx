@@ -129,7 +129,8 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
   const [interactionPage, setInteractionPage] = useState(1);
   const [activityPageSize, setActivityPageSize] = useState(10);
   const [interactionPageSize, setInteractionPageSize] = useState(10);
-  const currentUserId = typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
+  const currentUserId =
+    typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
   const [selectedUserId, setSelectedUserId] = useState(currentUserId);
 
   // Date filters using dayjs (start with no filter)
@@ -138,9 +139,12 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
 
   // Fetch all users
-  const { data: usersData, isLoading: usersLoading } = useGetCxiUsersQuery(undefined, {
-    skip: !open,
-  });
+  const { data: usersData, isLoading: usersLoading } = useGetCxiUsersQuery(
+    undefined,
+    {
+      skip: !open,
+    },
+  );
 
   // Reset selected user when dialog opens
   useEffect(() => {
@@ -162,7 +166,11 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
   const createdTo = parsedDates[1] || undefined;
 
   // Activity query
-  const { data: activityData, isLoading: activityLoading, isFetching: activityFetching } = useGetUserActivityQuery(
+  const {
+    data: activityData,
+    isLoading: activityLoading,
+    isFetching: activityFetching,
+  } = useGetUserActivityQuery(
     {
       user_id: selectedUserId,
       activity_type: "LOGIN_SUCCESS,LOGOUT,LOGIN_FAILED",
@@ -171,11 +179,15 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
       page: activityPage,
       page_size: activityPageSize,
     },
-    { skip: !open || !selectedUserId || activeTab !== 0 }
+    { skip: !open || !selectedUserId || activeTab !== 0 },
   );
 
   // Interaction query
-  const { data: interactionData, isLoading: interactionLoading, isFetching: interactionFetching } = useGetUserInteractionQuery(
+  const {
+    data: interactionData,
+    isLoading: interactionLoading,
+    isFetching: interactionFetching,
+  } = useGetUserInteractionQuery(
     {
       user_id: selectedUserId,
       created_from: createdFrom,
@@ -183,7 +195,7 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
       page: interactionPage,
       page_size: interactionPageSize,
     },
-    { skip: !open || !selectedUserId || activeTab !== 1 }
+    { skip: !open || !selectedUserId || activeTab !== 1 },
   );
 
   const users = usersData?.data || [];
@@ -241,7 +253,8 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
         bgcolor: COLORS.bgCard,
         color: COLORS.textPrimary,
         maxHeight: 300,
-        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+        boxShadow:
+          "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
         border: `1px solid ${COLORS.border}`,
       },
     },
@@ -280,25 +293,52 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
         }}
       >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: COLORS.textPrimary }}>
+          <Typography
+            variant="h5"
+            sx={{ fontWeight: 700, color: COLORS.textPrimary }}
+          >
             Activity log
           </Typography>
           {selectedUserId && (
-            <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary, mt: 0.5 }}>
-              Viewing: {users.find((u) => u.user_id === selectedUserId)?.user_name || selectedUserId}
+            <Typography
+              sx={{ fontSize: "13px", color: COLORS.textSecondary, mt: 0.5 }}
+            >
+              Viewing:{" "}
+              {users.find((u) => u.user_id === selectedUserId)?.user_name ||
+                selectedUserId}
             </Typography>
           )}
         </Box>
-        <IconButton onClick={onClose} sx={{ color: COLORS.textSecondary, "&:hover": { bgcolor: COLORS.bgHover } }}>
+        <IconButton
+          onClick={onClose}
+          sx={{
+            color: COLORS.textSecondary,
+            "&:hover": { bgcolor: COLORS.bgHover },
+          }}
+        >
           <CloseIcon />
         </IconButton>
       </DialogTitle>
       <DialogContent sx={{ p: 0, bgcolor: COLORS.bgCard }}>
         {/* Filters Section */}
-        <Box sx={{ p: 2.5, borderBottom: `1px solid ${COLORS.border}`, bgcolor: COLORS.bgCard }}>
+        <Box
+          sx={{
+            p: 2.5,
+            borderBottom: `1px solid ${COLORS.border}`,
+            bgcolor: COLORS.bgCard,
+          }}
+        >
           <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
-            <FilterListIcon sx={{ color: COLORS.textSecondary, fontSize: 20 }} />
-            <Typography sx={{ fontSize: "14px", fontWeight: 600, color: COLORS.textPrimary }}>
+            <FilterListIcon
+              sx={{ color: COLORS.textSecondary, fontSize: 20 }}
+            />
+            <Typography
+              sx={{
+                fontSize: "14px",
+                fontWeight: 600,
+                color: COLORS.textPrimary,
+              }}
+            >
               Filters
             </Typography>
           </Box>
@@ -307,7 +347,10 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
             <FormControl size="small" sx={{ minWidth: 200, flex: 1 }}>
               <InputLabel
                 id="user-select-label"
-                sx={{ color: COLORS.textSecondary, "&.Mui-focused": { color: COLORS.accent } }}
+                sx={{
+                  color: COLORS.textSecondary,
+                  "&.Mui-focused": { color: COLORS.accent },
+                }}
               >
                 Select User
               </InputLabel>
@@ -321,12 +364,24 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                 MenuProps={menuProps}
               >
                 {users.map((user) => (
-                  <MenuItem key={user.user_id} value={user.user_id} sx={menuItemStyles}>
+                  <MenuItem
+                    key={user.user_id}
+                    value={user.user_id}
+                    sx={menuItemStyles}
+                  >
                     <Box>
-                      <Typography sx={{ fontSize: "14px", fontWeight: 500, color: COLORS.textPrimary }}>
+                      <Typography
+                        sx={{
+                          fontSize: "14px",
+                          fontWeight: 500,
+                          color: COLORS.textPrimary,
+                        }}
+                      >
                         {user.user_name}
                       </Typography>
-                      <Typography sx={{ fontSize: "12px", color: COLORS.textSecondary }}>
+                      <Typography
+                        sx={{ fontSize: "12px", color: COLORS.textSecondary }}
+                      >
                         {user.email} ({user.user_id})
                       </Typography>
                     </Box>
@@ -349,7 +404,12 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
         </Box>
 
         {/* Tabs */}
-        <Box sx={{ borderBottom: `1px solid ${COLORS.border}`, bgcolor: COLORS.bgCard }}>
+        <Box
+          sx={{
+            borderBottom: `1px solid ${COLORS.border}`,
+            bgcolor: COLORS.bgCard,
+          }}
+        >
           <Tabs
             value={activeTab}
             onChange={handleTabChange}
@@ -381,7 +441,14 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
         {activeTab === 0 && (
           <>
             {activityLoading || activityFetching ? (
-              <Box sx={{ display: "flex", justifyContent: "center", p: 6, bgcolor: COLORS.bgCard }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  p: 6,
+                  bgcolor: COLORS.bgCard,
+                }}
+              >
                 <CircularProgress sx={{ color: COLORS.accent }} size={32} />
               </Box>
             ) : !selectedUserId ? (
@@ -404,6 +471,8 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                     sx={{
                       display: "grid",
                       gridTemplateColumns: "180px 1fr 150px 100px",
+                      // gridTemplateColumns: "180px 80px 1fr 80px 120px 1fr",
+
                       gap: 2,
                       px: 2,
                       py: 1.5,
@@ -411,16 +480,44 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                       mb: 1,
                     }}
                   >
-                    <Typography sx={{ fontSize: "12px", fontWeight: 600, color: COLORS.textSecondary, textTransform: "uppercase" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Date and time
                     </Typography>
-                    <Typography sx={{ fontSize: "12px", fontWeight: 600, color: COLORS.textSecondary, textTransform: "uppercase" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Event
                     </Typography>
-                    <Typography sx={{ fontSize: "12px", fontWeight: 600, color: COLORS.textSecondary, textTransform: "uppercase" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       IP Address
                     </Typography>
-                    <Typography sx={{ fontSize: "12px", fontWeight: 600, color: COLORS.textSecondary, textTransform: "uppercase" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Browser
                     </Typography>
                   </Box>
@@ -442,10 +539,18 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                           },
                         }}
                       >
-                        <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary }}>
+                        <Typography
+                          sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                        >
                           {formatDate(record.created_at)}
                         </Typography>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.5,
+                          }}
+                        >
                           <Box
                             sx={{
                               p: 0.75,
@@ -459,11 +564,19 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                             {getActivityIcon(record.activity_type)}
                           </Box>
                           <Box>
-                            <Typography sx={{ fontSize: "14px", fontWeight: 500, color: COLORS.textPrimary }}>
+                            <Typography
+                              sx={{
+                                fontSize: "14px",
+                                fontWeight: 500,
+                                color: COLORS.textPrimary,
+                              }}
+                            >
                               {record.activity_type.replace(/_/g, " ")}
                             </Typography>
                             {record.failure_reason && (
-                              <Typography sx={{ fontSize: "12px", color: "#ef4444" }}>
+                              <Typography
+                                sx={{ fontSize: "12px", color: "#ef4444" }}
+                              >
                                 {record.failure_reason}
                               </Typography>
                             )}
@@ -479,15 +592,21 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                                 fontWeight: 600,
                                 height: 24,
                                 cursor: "pointer",
-                                "&:hover": { bgcolor: "rgba(79, 70, 229, 0.08)" },
+                                "&:hover": {
+                                  bgcolor: "rgba(79, 70, 229, 0.08)",
+                                },
                               }}
                             />
                           )}
                         </Box>
-                        <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary }}>
+                        <Typography
+                          sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                        >
                           {record.ip_address}
                         </Typography>
-                        <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary }}>
+                        <Typography
+                          sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                        >
                           {parseUserAgent(record.user_agent)}
                         </Typography>
                       </Box>
@@ -507,12 +626,16 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary }}>
+                    <Typography
+                      sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                    >
                       Rows per page
                     </Typography>
                     <Select
                       value={activityPageSize}
-                      onChange={(e) => handleActivityPageSizeChange(e.target.value as number)}
+                      onChange={(e) =>
+                        handleActivityPageSizeChange(e.target.value as number)
+                      }
                       size="small"
                       sx={{
                         ...selectStyles,
@@ -530,28 +653,36 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                   </Box>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                     {activityPagination && (
-                      <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary }}>
-                        {((activityPage - 1) * activityPageSize) + 1}-{Math.min(activityPage * activityPageSize, activityPagination.total_items)} of {activityPagination.total_items}
+                      <Typography
+                        sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                      >
+                        {(activityPage - 1) * activityPageSize + 1}-
+                        {Math.min(
+                          activityPage * activityPageSize,
+                          activityPagination.total_items,
+                        )}{" "}
+                        of {activityPagination.total_items}
                       </Typography>
                     )}
-                    {activityPagination && activityPagination.total_pages > 1 && (
-                      <Pagination
-                        count={activityPagination.total_pages}
-                        page={activityPage}
-                        onChange={(_, value) => setActivityPage(value)}
-                        size="small"
-                        sx={{
-                          "& .MuiPaginationItem-root": {
-                            color: COLORS.textSecondary,
-                            borderColor: COLORS.border,
-                          },
-                          "& .Mui-selected": {
-                            bgcolor: `${COLORS.accent} !important`,
-                            color: "#fff !important",
-                          },
-                        }}
-                      />
-                    )}
+                    {activityPagination &&
+                      activityPagination.total_pages > 1 && (
+                        <Pagination
+                          count={activityPagination.total_pages}
+                          page={activityPage}
+                          onChange={(_, value) => setActivityPage(value)}
+                          size="small"
+                          sx={{
+                            "& .MuiPaginationItem-root": {
+                              color: COLORS.textSecondary,
+                              borderColor: COLORS.border,
+                            },
+                            "& .Mui-selected": {
+                              bgcolor: `${COLORS.accent} !important`,
+                              color: "#fff !important",
+                            },
+                          }}
+                        />
+                      )}
                   </Box>
                 </Box>
               </>
@@ -562,7 +693,14 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
         {activeTab === 1 && (
           <>
             {interactionLoading || interactionFetching ? (
-              <Box sx={{ display: "flex", justifyContent: "center", p: 6, bgcolor: COLORS.bgCard }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "center",
+                  p: 6,
+                  bgcolor: COLORS.bgCard,
+                }}
+              >
                 <CircularProgress sx={{ color: COLORS.accent }} size={32} />
               </Box>
             ) : !selectedUserId ? (
@@ -584,7 +722,8 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                   <Box
                     sx={{
                       display: "grid",
-                      gridTemplateColumns: "180px 80px 1fr 80px 120px",
+                      // gridTemplateColumns: "180px 80px 1fr 80px 120px",
+                      gridTemplateColumns: "180px 80px 1fr 80px 120px 1fr",
                       gap: 2,
                       px: 2,
                       py: 1.5,
@@ -592,20 +731,65 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                       mb: 1,
                     }}
                   >
-                    <Typography sx={{ fontSize: "12px", fontWeight: 600, color: COLORS.textSecondary, textTransform: "uppercase" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Date and time
                     </Typography>
-                    <Typography sx={{ fontSize: "12px", fontWeight: 600, color: COLORS.textSecondary, textTransform: "uppercase" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Method
                     </Typography>
-                    <Typography sx={{ fontSize: "12px", fontWeight: 600, color: COLORS.textSecondary, textTransform: "uppercase" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Endpoint
                     </Typography>
-                    <Typography sx={{ fontSize: "12px", fontWeight: 600, color: COLORS.textSecondary, textTransform: "uppercase" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       Status
                     </Typography>
-                    <Typography sx={{ fontSize: "12px", fontWeight: 600, color: COLORS.textSecondary, textTransform: "uppercase" }}>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
                       IP Address
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Search Filters
                     </Typography>
                   </Box>
                   {interactionRecords.map((record) => {
@@ -615,7 +799,8 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                         key={record.id}
                         sx={{
                           display: "grid",
-                          gridTemplateColumns: "180px 80px 1fr 80px 120px",
+                          // gridTemplateColumns: "180px 80px 1fr 80px 120px",
+                          gridTemplateColumns: "180px 80px 1fr 80px 120px 1fr",
                           gap: 2,
                           px: 2,
                           py: 1.5,
@@ -626,7 +811,9 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                           },
                         }}
                       >
-                        <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary }}>
+                        <Typography
+                          sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                        >
                           {formatDate(record.created_at)}
                         </Typography>
                         <Chip
@@ -655,6 +842,7 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                             {record.endpoint}
                           </Typography>
                         </Tooltip>
+
                         <Chip
                           label={record.response_status}
                           size="small"
@@ -668,9 +856,69 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                             border: `1px solid ${getStatusColor(record.response_status)}20`,
                           }}
                         />
-                        <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary }}>
+                        <Typography
+                          sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                        >
                           {record.ip_address}
                         </Typography>
+                        {/* <Tooltip title={record.query_params} arrow>
+                          <Typography
+                            sx={{
+                              fontSize: "13px",
+                              color: COLORS.textPrimary,
+                              fontFamily: "monospace",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "pre-wrap", // allow line breaks
+                              wordBreak: "break-word", // wrap long params
+                            }}
+                          >
+                            {record.query_params}
+                          </Typography>
+                        </Tooltip> */}
+                        <Tooltip title={record.query_params} arrow>
+                          <Typography
+                            sx={{
+                              fontSize: "13px",
+                              color: COLORS.textPrimary,
+                              fontFamily: "monospace",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "pre-wrap", // allow line breaks
+                              wordBreak: "break-word", // wrap long params
+                            }}
+                          >
+                            {/* {decodeURIComponent(
+                              record.query_params.replace(/\+/g, " "),
+                            )
+                              .split("&")
+                              .filter(
+                                (param) =>
+                                  !param.startsWith("page=") &&
+                                  !param.startsWith("page_size="),
+                              )
+                              .join("\n")} */}
+                            {decodeURIComponent(
+                              record.query_params.replace(/\+/g, " "),
+                            )
+                              .split("&")
+                              .filter((param) => {
+                                // Hide page & page_size if page=1
+                                if (
+                                  param.startsWith("page=") &&
+                                  param === "page=1"
+                                )
+                                  return false;
+                                if (
+                                  param.startsWith("page_size=") &&
+                                  record.query_params.includes("page=1")
+                                )
+                                  return false;
+                                return true; // keep all other params
+                              })
+                              .join("\n")}
+                          </Typography>
+                        </Tooltip>
                       </Box>
                     );
                   })}
@@ -688,12 +936,18 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                   }}
                 >
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary }}>
+                    <Typography
+                      sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                    >
                       Rows per page
                     </Typography>
                     <Select
                       value={interactionPageSize}
-                      onChange={(e) => handleInteractionPageSizeChange(e.target.value as number)}
+                      onChange={(e) =>
+                        handleInteractionPageSizeChange(
+                          e.target.value as number,
+                        )
+                      }
                       size="small"
                       sx={{
                         ...selectStyles,
@@ -711,28 +965,36 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                   </Box>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                     {interactionPagination && (
-                      <Typography sx={{ fontSize: "13px", color: COLORS.textSecondary }}>
-                        {((interactionPage - 1) * interactionPageSize) + 1}-{Math.min(interactionPage * interactionPageSize, interactionPagination.total_items)} of {interactionPagination.total_items}
+                      <Typography
+                        sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                      >
+                        {(interactionPage - 1) * interactionPageSize + 1}-
+                        {Math.min(
+                          interactionPage * interactionPageSize,
+                          interactionPagination.total_items,
+                        )}{" "}
+                        of {interactionPagination.total_items}
                       </Typography>
                     )}
-                    {interactionPagination && interactionPagination.total_pages > 1 && (
-                      <Pagination
-                        count={interactionPagination.total_pages}
-                        page={interactionPage}
-                        onChange={(_, value) => setInteractionPage(value)}
-                        size="small"
-                        sx={{
-                          "& .MuiPaginationItem-root": {
-                            color: COLORS.textSecondary,
-                            borderColor: COLORS.border,
-                          },
-                          "& .Mui-selected": {
-                            bgcolor: `${COLORS.accent} !important`,
-                            color: "#fff !important",
-                          },
-                        }}
-                      />
-                    )}
+                    {interactionPagination &&
+                      interactionPagination.total_pages > 1 && (
+                        <Pagination
+                          count={interactionPagination.total_pages}
+                          page={interactionPage}
+                          onChange={(_, value) => setInteractionPage(value)}
+                          size="small"
+                          sx={{
+                            "& .MuiPaginationItem-root": {
+                              color: COLORS.textSecondary,
+                              borderColor: COLORS.border,
+                            },
+                            "& .Mui-selected": {
+                              bgcolor: `${COLORS.accent} !important`,
+                              color: "#fff !important",
+                            },
+                          }}
+                        />
+                      )}
                   </Box>
                 </Box>
               </>

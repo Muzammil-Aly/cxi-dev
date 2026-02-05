@@ -45,7 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [activityLogOpen, setActivityLogOpen] = useState(false);
 
   // Check if current user is admin (mdb1)
-  const isAdmin = userId === "mdb0";
+  const isAdmin = userId === "kav1";
 
   useEffect(() => {
     const loadUser = () => {

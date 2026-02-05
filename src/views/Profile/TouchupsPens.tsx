@@ -117,7 +117,7 @@ const TouchupsPens: React.FC<Props> = ({
         setIsTyping((prev) => ({ ...prev, [key]: false }));
         setPage(1);
       }, 800),
-    []
+    [],
   );
 
   // --- Cancel filter ---
@@ -132,11 +132,13 @@ const TouchupsPens: React.FC<Props> = ({
     page_size: pageSizeInput,
     color_name: filters.ColorName,
     item_name2: filters.ItemName2,
-    ...(Colorslug ?? filters.Colorslug
+    ...((Colorslug ?? filters.Colorslug)
       ? { color_slug: Colorslug ?? filters.Colorslug }
       : shouldFilterNull
-      ? { color_slug: "null" } // only when we *want* to filter by null colors
-      : {}), // omit → show all data
+        ? { color_slug: "null" } // only when we *want* to filter by null colors
+        : {}), // omit → show all data
+
+    isFromProps: !filters.Colorslug && !!Colorslug, // true when using Colorslug prop, false when searching
   };
 
   const {
@@ -165,7 +167,7 @@ const TouchupsPens: React.FC<Props> = ({
   const renderFilter = (
     label: string,
     key: keyof typeof filters,
-    value: string
+    value: string,
   ) => (
     <FormControl sx={{ width: 150 }}>
       <TextField
