@@ -59,12 +59,20 @@ const InventoryPOTable: React.FC<InventoryPOTableProps> = ({
 
   //   return orderedColumns;
   // }, [userPreferences]);
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "qty_po_pop_up",
-      tabName: "InventoryPOTable",
-      defaultColumns: purchase_orders,
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "qty_po_pop_up",
+    tabName: "InventoryPOTable",
+    defaultColumns: purchase_orders,
+  });
   // Apply column customization
   const tiCol = usePurchaseOrders(filteredColumns);
 
@@ -198,6 +206,10 @@ const InventoryPOTable: React.FC<InventoryPOTableProps> = ({
             onColumnMoved={handleColumnMoved}
             onResetColumns={handleResetColumns}
             storageKey={storageKey}
+            allColumnsWithVisibility={allColumnsWithVisibility}
+            onToggleColumnVisibility={toggleColumnVisibility}
+            onUpdateColumnsVisibility={updateColumnsVisibility}
+            isVisibilityLoading={isSaving}
           />
         )}
       </Paper>

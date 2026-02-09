@@ -63,14 +63,22 @@ const InventorySOTable: React.FC<InventorySOTableProps> = ({
 
   // Apply column customization
 
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "qty_so_pop_up",
-      tabName: "InventorySOTable",
-      defaultColumns: sales_orders,
-      disableTabManagement: false,
-      parentTabName: "Inventory",
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "qty_so_pop_up",
+    tabName: "InventorySOTable",
+    defaultColumns: sales_orders,
+    disableTabManagement: false,
+    parentTabName: "Inventory",
+  });
   const tiCol = useSalesOrders(filteredColumns);
 
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -203,6 +211,10 @@ const InventorySOTable: React.FC<InventorySOTableProps> = ({
             onColumnMoved={handleColumnMoved}
             onResetColumns={handleResetColumns}
             storageKey={storageKey}
+            allColumnsWithVisibility={allColumnsWithVisibility}
+            onToggleColumnVisibility={toggleColumnVisibility}
+            onUpdateColumnsVisibility={updateColumnsVisibility}
+            isVisibilityLoading={isSaving}
           />
         )}
       </Paper>

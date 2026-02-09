@@ -39,7 +39,16 @@ interface MarketingEventsProps {
 }
 const MarketingEvents: React.FC<MarketingEventsProps> = ({ customerId }) => {
   // Use column preferences hook
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
     endpoint: "customer_events",
     tabName: "Marketing Events",
     defaultColumns: marketing_events,
@@ -306,8 +315,12 @@ const MarketingEvents: React.FC<MarketingEventsProps> = ({ customerId }) => {
               style={{ width: "100%", overflowX: "auto" }}
               paginationPageSize={pageSize}
               onColumnMoved={handleColumnMoved}
-          onResetColumns={handleResetColumns}
+              onResetColumns={handleResetColumns}
               storageKey={storageKey}
+              allColumnsWithVisibility={allColumnsWithVisibility}
+              onToggleColumnVisibility={toggleColumnVisibility}
+              onUpdateColumnsVisibility={updateColumnsVisibility}
+              isVisibilityLoading={isSaving}
             />
           </Box>
         )}

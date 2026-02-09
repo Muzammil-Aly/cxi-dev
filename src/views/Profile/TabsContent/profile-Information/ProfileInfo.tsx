@@ -111,7 +111,16 @@ const DetailedInfo = () => {
     });
 
   // Use column preferences hook
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
     endpoint: "customer_profile",
     tabName: "Profile Information",
     defaultColumns: users,
@@ -388,6 +397,10 @@ const DetailedInfo = () => {
           storageKey={storageKey}
           onColumnMoved={handleColumnMoved}
           onResetColumns={handleResetColumns}
+          allColumnsWithVisibility={allColumnsWithVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onUpdateColumnsVisibility={updateColumnsVisibility}
+          isVisibilityLoading={isSaving}
         />
       )}
       <UserDetailsModal

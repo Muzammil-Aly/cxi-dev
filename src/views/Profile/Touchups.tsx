@@ -63,17 +63,25 @@ const Touchups = ({
   const isNestedComponent = !!lotNo || !!sku || shouldFilterNull === false;
   const [refetchKey, setRefetchKey] = useState<number>(0);
 
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "touchup_part",
-      tabName: "Touchups",
-      defaultColumns: touchups_columns,
-      disableTabManagement: isNestedComponent,
-      parentTabName: isNestedComponent ? ["Inventory", "Orders"] : undefined, // Refetch when Inventory or Orders tab is activated
-      isVisible: isNestedComponent ? isTouchupsOpen : undefined, // Track visibility for nested component
-      // refetchTrigger: isNestedComponent ? lotNo : undefined, // Refetch when lotNo changes
-      refetchTrigger: isNestedComponent ? refetchKey : undefined, // Refetch when refetchKey changes
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "touchup_part",
+    tabName: "Touchups",
+    defaultColumns: touchups_columns,
+    disableTabManagement: isNestedComponent,
+    parentTabName: isNestedComponent ? ["Inventory", "Orders"] : undefined, // Refetch when Inventory or Orders tab is activated
+    isVisible: isNestedComponent ? isTouchupsOpen : undefined, // Track visibility for nested component
+    // refetchTrigger: isNestedComponent ? lotNo : undefined, // Refetch when lotNo changes
+    refetchTrigger: isNestedComponent ? refetchKey : undefined, // Refetch when refetchKey changes
+  });
 
   const touchupsCol = useTouchupsColumn(filteredColumns);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -444,6 +452,10 @@ const Touchups = ({
           onColumnMoved={handleColumnMoved}
           onResetColumns={handleResetColumns}
           storageKey={storageKey}
+          allColumnsWithVisibility={allColumnsWithVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onUpdateColumnsVisibility={updateColumnsVisibility}
+          isVisibilityLoading={isSaving}
         />
       )}
     </Box>

@@ -79,12 +79,20 @@ const Refund = ({ customer_id }: Props) => {
 
   //   return orderedColumns;
   // }, [userPreferences]);
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "orders_refund",
-      tabName: "refunds",
-      defaultColumns: Refunds,
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "orders_refund",
+    tabName: "refunds",
+    defaultColumns: Refunds,
+  });
   const columns = useRefundColumn(filteredColumns);
 
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
@@ -152,6 +160,10 @@ const Refund = ({ customer_id }: Props) => {
           onColumnMoved={handleColumnMoved}
           onResetColumns={handleResetColumns}
           storageKey={storageKey}
+          allColumnsWithVisibility={allColumnsWithVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onUpdateColumnsVisibility={updateColumnsVisibility}
+          isVisibilityLoading={isSaving}
         />
       )}
     </Box>

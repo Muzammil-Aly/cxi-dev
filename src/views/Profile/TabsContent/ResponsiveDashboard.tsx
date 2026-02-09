@@ -48,6 +48,11 @@ const ResponsiveDashboard = ({
   filters,
   onColumnMoved,
   onResetColumns,
+  // Column visibility props
+  allColumnsWithVisibility,
+  onToggleColumnVisibility,
+  onUpdateColumnsVisibility,
+  isVisibilityLoading,
 }: any) => {
   const dispatch = useDispatch();
 
@@ -286,6 +291,10 @@ const ResponsiveDashboard = ({
               storageKey={
                 currentMenu ? `${currentMenu}-columnOrder` : undefined
               }
+              allColumnsWithVisibility={allColumnsWithVisibility}
+              onToggleColumnVisibility={onToggleColumnVisibility}
+              onUpdateColumnsVisibility={onUpdateColumnsVisibility}
+              isVisibilityLoading={isVisibilityLoading}
             />
           </Box>
         </Paper>

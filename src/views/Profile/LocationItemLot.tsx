@@ -43,14 +43,22 @@ interface ZPartETAItem {
 const LocationItemLot = ({ sku }: Props) => {
   // Use column preferences hook
   // LocationItemLot is always nested (requires sku prop), so always disable tab management
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "location_item_lot",
-      tabName: "LocationItemLot",
-      defaultColumns: location_item_lot,
-      disableTabManagement: false,
-      parentTabName: "orders", // Refetch when orders tab is activated
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "location_item_lot",
+    tabName: "LocationItemLot",
+    defaultColumns: location_item_lot,
+    disableTabManagement: false,
+    parentTabName: "orders", // Refetch when orders tab is activated
+  });
 
   // Apply column customization
   const orderItemsCol = useLocationItemLot(filteredColumns);
@@ -163,6 +171,10 @@ const LocationItemLot = ({ sku }: Props) => {
           onColumnMoved={handleColumnMoved}
           onResetColumns={handleResetColumns}
           storageKey={storageKey}
+          allColumnsWithVisibility={allColumnsWithVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onUpdateColumnsVisibility={updateColumnsVisibility}
+          isVisibilityLoading={isSaving}
         />
       )}
     </Box>

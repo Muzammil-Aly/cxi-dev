@@ -42,17 +42,25 @@ const ItemTrackingComments = ({
   const { isActive, activeTabName, isTouchupPensOpen, isTouchupsOpen } =
     useSelector((state: RootState) => state.tab);
   // Column preferences hook
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "item_tracking_comments",
-      tabName: "Item Tracking Comments",
-      defaultColumns: item_tracking_comments,
-      disableTabManagement: false,
-      // parentTabName: "orders",
-      parentTabName: isNestedComponent ? ["Inventory", "Orders"] : undefined, // Refetch when Inventory or Orders tab is activated
-      isVisible: isNestedComponent ? isTouchupsOpen : undefined, // Track visibility for nested component
-      refetchTrigger: isNestedComponent ? refetchKey : undefined, // Refetch when refetchKey changes
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "item_tracking_comments",
+    tabName: "Item Tracking Comments",
+    defaultColumns: item_tracking_comments,
+    disableTabManagement: false,
+    // parentTabName: "orders",
+    parentTabName: isNestedComponent ? ["Inventory", "Orders"] : undefined, // Refetch when Inventory or Orders tab is activated
+    isVisible: isNestedComponent ? isTouchupsOpen : undefined, // Track visibility for nested component
+    refetchTrigger: isNestedComponent ? refetchKey : undefined, // Refetch when refetchKey changes
+  });
 
   const orderItemsCol = useItemTrackingComments(filteredColumns);
 
@@ -374,6 +382,10 @@ const ItemTrackingComments = ({
           onColumnMoved={handleColumnMoved}
           onResetColumns={handleResetColumns}
           storageKey={storageKey}
+          allColumnsWithVisibility={allColumnsWithVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onUpdateColumnsVisibility={updateColumnsVisibility}
+          isVisibilityLoading={isSaving}
         />
       )}
     </Box>

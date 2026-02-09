@@ -3,6 +3,7 @@ import { AgGridReact } from "ag-grid-react";
 import "./index.scss";
 import { Box, IconButton, Tooltip } from "@mui/material";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import ColumnVisibilitySettings from "./ColumnVisibilitySettings";
 import "ag-grid-community/styles/ag-grid.css";
 import "ag-grid-community/styles/ag-theme-material.css";
 import {
@@ -51,6 +52,12 @@ const AgGridTable: React.FC<any> = ({
   className,
   noTopBorder,
   storageKey, // Optional: unique key for localStorage (e.g., "myGrid-columnOrder")
+
+  // Column visibility props
+  allColumnsWithVisibility,
+  onToggleColumnVisibility,
+  onUpdateColumnsVisibility,
+  isVisibilityLoading = false,
 
   ...gridProps
 }) => {
@@ -146,8 +153,19 @@ const AgGridTable: React.FC<any> = ({
               top: 8,
               right: 8,
               zIndex: 10,
+              display: "flex",
+              gap: 1,
             }}
           >
+            {/* Column Visibility Settings */}
+            <ColumnVisibilitySettings
+              columns={allColumnsWithVisibility || []}
+              onToggleColumn={onToggleColumnVisibility || (() => {})}
+              onUpdateMultiple={onUpdateColumnsVisibility || (() => {})}
+              isLoading={isVisibilityLoading}
+            />
+
+            {/* Reset Columns Button */}
             <Tooltip title="Reset columns to default" placement="left">
               <IconButton
                 onClick={handleResetColumns}

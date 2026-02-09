@@ -54,16 +54,24 @@ const TouchupsPens: React.FC<Props> = ({
 
   const isNestedComponent =
     !!orderId || !!Colorslug || shouldFilterNull === false;
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "touchup_pen",
-      tabName: "TouchupPens",
-      defaultColumns: touchups_pens,
-      disableTabManagement: isNestedComponent,
-      parentTabName: isNestedComponent ? ["Inventory", "Orders"] : undefined, // Refetch when Inventory or Orders tab is activated
-      isVisible: isNestedComponent ? isTouchupPensOpen : undefined, // Track visibility for nested component
-      refetchTrigger: isNestedComponent ? refetchKey : undefined, // Refetch when refetchKey changes
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "touchup_pen",
+    tabName: "TouchupPens",
+    defaultColumns: touchups_pens,
+    disableTabManagement: isNestedComponent,
+    parentTabName: isNestedComponent ? ["Inventory", "Orders"] : undefined, // Refetch when Inventory or Orders tab is activated
+    isVisible: isNestedComponent ? isTouchupPensOpen : undefined, // Track visibility for nested component
+    refetchTrigger: isNestedComponent ? refetchKey : undefined, // Refetch when refetchKey changes
+  });
 
   // Trigger preference refetch when component opens
   useEffect(() => {
@@ -397,6 +405,10 @@ const TouchupsPens: React.FC<Props> = ({
           onColumnMoved={handleColumnMoved}
           onResetColumns={handleResetColumns}
           storageKey={storageKey}
+          allColumnsWithVisibility={allColumnsWithVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onUpdateColumnsVisibility={updateColumnsVisibility}
+          isVisibilityLoading={isSaving}
         />
       )}
     </Box>

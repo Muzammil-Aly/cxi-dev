@@ -20,14 +20,22 @@ interface Props {
 
 const NavETA = ({ sku }: Props) => {
   // Use column preferences hook
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "nav_eta",
-      tabName: "NavETA",
-      defaultColumns: nav_eta,
-      disableTabManagement: false,
-      parentTabName: "orders", // Refetch when orders tab is activated
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "nav_eta",
+    tabName: "NavETA",
+    defaultColumns: nav_eta,
+    disableTabManagement: false,
+    parentTabName: "orders", // Refetch when orders tab is activated
+  });
 
   // Apply column customization
   const orderItemsCol = useNavETA(filteredColumns);
@@ -132,6 +140,10 @@ const NavETA = ({ sku }: Props) => {
           onColumnMoved={handleColumnMoved}
           onResetColumns={handleResetColumns}
           storageKey={storageKey}
+          allColumnsWithVisibility={allColumnsWithVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onUpdateColumnsVisibility={updateColumnsVisibility}
+          isVisibilityLoading={isSaving}
         />
       )}
     </Box>

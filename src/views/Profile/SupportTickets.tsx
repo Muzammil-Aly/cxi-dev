@@ -52,7 +52,16 @@ interface OrdersProps {
 
 const SupportTickets = ({ customerId }: { customerId?: string }) => {
   // Use column preferences hook
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } = useColumnPreferences({
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
     endpoint: "support_tickets",
     tabName: "SupportTickets",
     defaultColumns: support_tickets,
@@ -467,6 +476,10 @@ const SupportTickets = ({ customerId }: { customerId?: string }) => {
               paginationPageSize={pageSize}
               onColumnMoved={handleColumnMoved}
               onResetColumns={handleResetColumns}
+              allColumnsWithVisibility={allColumnsWithVisibility}
+              onToggleColumnVisibility={toggleColumnVisibility}
+              onUpdateColumnsVisibility={updateColumnsVisibility}
+              isVisibilityLoading={isSaving}
             />
           </Box>
         )}

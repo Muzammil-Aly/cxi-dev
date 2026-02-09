@@ -64,14 +64,22 @@ const OrderItems = ({
 
   // Use column preferences hook
   // OrderItems is always nested (requires orderId prop), so always disable tab management
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "customer_order_items",
-      tabName: "OrderItems",
-      defaultColumns: baseColumns,
-      // disableTabManagement: true,
-      // parentTabName: "Orders", // Refetch when Orders tab is activated
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "customer_order_items",
+    tabName: "OrderItems",
+    defaultColumns: baseColumns,
+    // disableTabManagement: true,
+    // parentTabName: "Orders", // Refetch when Orders tab is activated
+  });
 
   const orderItemsCol = useOrderItems(filteredColumns);
   const { isActive, activeTabName, isTouchupsOpen } = useSelector(
@@ -220,6 +228,10 @@ const OrderItems = ({
           onColumnMoved={handleColumnMoved}
           onResetColumns={handleResetColumns}
           storageKey={storageKey}
+          allColumnsWithVisibility={allColumnsWithVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onUpdateColumnsVisibility={updateColumnsVisibility}
+          isVisibilityLoading={isSaving}
         />
       )}
     </Box>

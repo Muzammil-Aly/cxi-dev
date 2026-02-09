@@ -329,12 +329,20 @@ const Inventory = () => {
   );
 
   // Use column preferences hook
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "inventory_Availability",
-      tabName: "Inventory",
-      defaultColumns: baseColumns,
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "inventory_Availability",
+    tabName: "Inventory",
+    defaultColumns: baseColumns,
+  });
 
   // Apply column customization
   const tiCol = useInventoryColumn(filteredColumns);
@@ -461,6 +469,10 @@ const Inventory = () => {
               onColumnMoved={handleColumnMoved}
               onResetColumns={handleResetColumns}
               storageKey={storageKey}
+              allColumnsWithVisibility={allColumnsWithVisibility}
+              onToggleColumnVisibility={toggleColumnVisibility}
+              onUpdateColumnsVisibility={updateColumnsVisibility}
+              isVisibilityLoading={isSaving}
             />
           )}
         </Paper>

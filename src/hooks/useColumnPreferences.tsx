@@ -19,12 +19,22 @@ interface UseColumnPreferencesProps {
   refetchTrigger?: any; // Optional: any value that when changed should trigger a preferences refetch (e.g., lotNo, colorSlug)
 }
 
+export interface ColumnVisibility {
+  field: string;
+  headerName: string;
+  visible: boolean; // true = visible, false = hidden (hide_flag: true in API)
+}
+
 interface UseColumnPreferencesReturn {
   filteredColumns: any[];
+  allColumnsWithVisibility: ColumnVisibility[];
   handleColumnMoved: (event: any) => void;
   handleResetColumns: () => void;
+  toggleColumnVisibility: (field: string) => void;
+  updateColumnsVisibility: (updates: { field: string; visible: boolean }[]) => void;
   storageKey: string;
   isLoading: boolean;
+  isSaving: boolean;
 }
 
 /**
@@ -87,6 +97,7 @@ export const useColumnPreferences = ({
     Map<string, any>
   >(new Map());
   const [currentColumnOrder, setCurrentColumnOrder] = useState<any[]>([]);
+  const [columnVisibility, setColumnVisibility] = useState<Map<string, boolean>>(new Map()); // field -> visible (opposite of hide_flag)
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
   const [forceRefreshCounter, setForceRefreshCounter] = useState(0);
 
@@ -101,10 +112,23 @@ export const useColumnPreferences = ({
 
   // Sort columns based on user preferences
   const filteredColumns = useMemo(() => {
+    // Helper function to filter out hidden columns based on visibility state
+    const filterVisibleColumns = (columns: any[]) => {
+      // If we have visibility state, filter out hidden columns
+      if (columnVisibility.size > 0) {
+        return columns.filter((col) => {
+          const isVisible = columnVisibility.get(col.field);
+          // If visibility is explicitly set to false, hide the column
+          return isVisible !== false;
+        });
+      }
+      return columns;
+    };
+
     // If we have a pending column order (from user drag), use that
     if (currentColumnOrder.length > 0) {
       console.log(`[${tabName}] Using current column order (user modified)`);
-      return currentColumnOrder;
+      return filterVisibleColumns(currentColumnOrder);
     }
 
     // Otherwise, use API data
@@ -117,7 +141,10 @@ export const useColumnPreferences = ({
 
       const prefsData = (userPreferences as any).data;
 
-      // Store default preferences on first load (only once)
+      // Debug: Log hide_flag values from API
+      console.log(`[${tabName}] API hide_flag values:`, prefsData.map((p: any) => ({ field: p.preference, hide_flag: p.hide_flag })));
+
+      // Store default preferences and visibility on first load (only once)
       if (defaultPreferences.size === 0) {
         const defaultMap = new Map<string, any>(
           prefsData.map((pref: any) => [
@@ -125,10 +152,21 @@ export const useColumnPreferences = ({
             {
               default_preference: pref.default_preference,
               defualt_sort: pref.defualt_sort, // Keep original typo as is in backend
+              hide_flag: pref.hide_flag,
             },
           ])
         );
         setDefaultPreferences(defaultMap);
+
+        // Initialize column visibility from API data
+        // hide_flag: true means column is visible, hide_flag: false means hidden
+        const visibilityMap = new Map<string, boolean>(
+          prefsData.map((pref: any) => [
+            pref.preference,
+            pref.hide_flag === true, // visible when hide_flag is true
+          ])
+        );
+        setColumnVisibility(visibilityMap);
       }
 
       // Create a map of preference field to sort order
@@ -136,7 +174,12 @@ export const useColumnPreferences = ({
         prefsData.map((pref: any) => [pref.preference, pref.preference_sort])
       );
 
-      // Filter columns that exist in preferences and sort by preference_sort
+      // Create a map of preference field to hide_flag
+      const hideMap = new Map(
+        prefsData.map((pref: any) => [pref.preference, pref.hide_flag])
+      );
+
+      // Filter columns that exist in preferences, respect hide_flag, and sort by preference_sort
       const orderedColumns = defaultColumns
         .filter((col) => col && preferenceMap.has(col.field))
         .sort((a, b) => {
@@ -145,7 +188,13 @@ export const useColumnPreferences = ({
           return sortA - sortB;
         });
 
-      return orderedColumns;
+      // Use columnVisibility state if set, otherwise use API hide_flag
+      if (columnVisibility.size > 0) {
+        return filterVisibleColumns(orderedColumns);
+      }
+
+      // Filter out hidden columns based on API hide_flag (hide_flag: true = visible)
+      return orderedColumns.filter((col) => hideMap.get(col.field) === true);
     }
 
     // If no API data, return all default columns
@@ -158,6 +207,7 @@ export const useColumnPreferences = ({
     defaultColumns,
     tabName,
     forceRefreshCounter,
+    columnVisibility,
   ]);
 
   // Handle column reorder event with debouncing
@@ -228,11 +278,21 @@ export const useColumnPreferences = ({
 
         // Debounce the API call by 500ms
         columnMoveTimerRef.current = setTimeout(async () => {
-          // Map column state to the backend format
-          const preferencesData = columnState
+          // Get visible column IDs from AG Grid
+          const visibleColumnIds = columnState
+            .filter((col: any) => col.colId)
+            .map((col: any) => col.colId);
+
+          // Map visible columns with their new sort order
+          const visiblePreferencesData = columnState
             .filter((col: any) => col.colId)
             .map((col: any, index: number) => {
               const defaults = defaultPreferences.get(col.colId);
+
+              // Preserve hide_flag: use local state if set, otherwise use API value
+              const hideFlag = columnVisibility.has(col.colId)
+                ? columnVisibility.get(col.colId)
+                : (defaults?.hide_flag ?? true);
 
               return {
                 user_id: userId,
@@ -241,8 +301,58 @@ export const useColumnPreferences = ({
                 preference_sort: index + 1,
                 default_preference: defaults?.default_preference || col.colId,
                 defualt_sort: defaults?.defualt_sort || index + 1,
+                hide_flag: hideFlag,
               };
             });
+
+          // CRITICAL: Also include hidden columns with updated preference_sort values
+          // This prevents duplicate sort values when hidden columns are made visible
+          const hiddenColumns: any[] = [];
+          let hiddenSortIndex = visiblePreferencesData.length + 1;
+
+          // Find hidden columns from columnVisibility state (local state)
+          columnVisibility.forEach((isVisible, field) => {
+            if (!isVisible && !visibleColumnIds.includes(field)) {
+              const defaults = defaultPreferences.get(field);
+              if (defaults) {
+                hiddenColumns.push({
+                  user_id: userId,
+                  endpoint: endpoint,
+                  preference: field,
+                  preference_sort: hiddenSortIndex++,
+                  default_preference: defaults?.default_preference || field,
+                  defualt_sort: defaults?.defualt_sort || hiddenSortIndex,
+                  hide_flag: false, // Hidden column
+                });
+              }
+            }
+          });
+
+          // Also check API preferences for hidden columns we might have missed
+          const prefsData = (userPreferences as any)?.data || [];
+          prefsData.forEach((pref: any) => {
+            const field = pref.preference;
+            // Check if this column is hidden (hide_flag: false) and not already in our lists
+            const isInVisible = visibleColumnIds.includes(field);
+            const isInHidden = hiddenColumns.some((col) => col.preference === field);
+            const isHiddenInLocalState = columnVisibility.get(field) === false;
+            const isHiddenInAPI = pref.hide_flag === false;
+
+            if (!isInVisible && !isInHidden && (isHiddenInLocalState || isHiddenInAPI)) {
+              hiddenColumns.push({
+                user_id: userId,
+                endpoint: endpoint,
+                preference: field,
+                preference_sort: hiddenSortIndex++,
+                default_preference: pref.default_preference || field,
+                defualt_sort: pref.defualt_sort || hiddenSortIndex,
+                hide_flag: false, // Hidden column
+              });
+            }
+          });
+
+          // Combine visible and hidden columns
+          const preferencesData = [...visiblePreferencesData, ...hiddenColumns];
 
           const apiPayload = { data: preferencesData };
 
@@ -252,6 +362,7 @@ export const useColumnPreferences = ({
             `[${tabName}] Number of columns:`,
             preferencesData.length
           );
+          console.log(`[${tabName}] hide_flag values being sent:`, preferencesData.map((p: any) => ({ field: p.preference, hide_flag: p.hide_flag })));
 
           setIsSavingPreferences(true);
 
@@ -317,12 +428,229 @@ export const useColumnPreferences = ({
     },
     [
       defaultPreferences,
+      columnVisibility,
       userId,
       endpoint,
       upsertUserPreferences,
       defaultColumns,
       tabName,
+      userPreferences,
     ]
+  );
+
+  // Compute all columns with their visibility status for settings UI
+  const allColumnsWithVisibility = useMemo<ColumnVisibility[]>(() => {
+    // Get all columns from API preferences or default columns
+    const prefsData = (userPreferences as any)?.data || [];
+
+    console.log(`[${tabName}] allColumnsWithVisibility - prefsData:`, prefsData.length, 'defaultColumns:', defaultColumns.length);
+
+    if (prefsData.length > 0) {
+      // Sort by preference_sort to maintain order
+      const sortedPrefs = [...prefsData].sort(
+        (a: any, b: any) => (a.preference_sort || 0) - (b.preference_sort || 0)
+      );
+
+      return sortedPrefs.map((pref: any) => {
+        const column = defaultColumns.find((col) => col?.field === pref.preference);
+        // Use columnVisibility state if available, otherwise use API hide_flag
+        // hide_flag: true = visible, hide_flag: false = hidden
+        const visible = columnVisibility.size > 0
+          ? columnVisibility.get(pref.preference) !== false
+          : pref.hide_flag === true;
+
+        return {
+          field: pref.preference,
+          headerName: column?.headerName || pref.preference,
+          visible,
+        };
+      });
+    }
+
+    // Fallback to default columns if no API data
+    const fallbackColumns = defaultColumns
+      .filter((col) => col && col.field)
+      .map((col) => ({
+        field: col.field,
+        headerName: col.headerName || col.field,
+        visible: columnVisibility.size > 0
+          ? columnVisibility.get(col.field) !== false
+          : true,
+      }));
+
+    console.log(`[${tabName}] Fallback columns:`, fallbackColumns.length, fallbackColumns);
+    return fallbackColumns;
+  }, [userPreferences, defaultColumns, columnVisibility, tabName]);
+
+  // Toggle visibility for a single column
+  const toggleColumnVisibility = useCallback(
+    async (field: string) => {
+      const currentVisible = columnVisibility.get(field) !== false;
+      const newVisible = !currentVisible;
+
+      console.log(`[${tabName}] Toggle visibility for ${field}: ${currentVisible} -> ${newVisible}`);
+      console.log(`[${tabName}] hide_flag will be sent as: ${newVisible}`);
+
+      // Update local state immediately (optimistic update)
+      setColumnVisibility((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(field, newVisible);
+        return newMap;
+      });
+
+      // CRITICAL: Clear currentColumnOrder when making a column visible
+      // This forces filteredColumns to recalculate from API data with updated visibility
+      // Without this, the column won't appear because currentColumnOrder doesn't include hidden columns
+      if (newVisible) {
+        setCurrentColumnOrder([]);
+        console.log(`[${tabName}] Cleared currentColumnOrder to ensure column ${field} appears`);
+      }
+
+      // Prepare API payload - update only this column's hide_flag
+      const prefsData = (userPreferences as any)?.data || [];
+      const existingPref = prefsData.find((p: any) => p.preference === field);
+
+      if (existingPref) {
+        const updatePayload = {
+          data: [
+            {
+              user_id: userId,
+              endpoint: endpoint,
+              preference: field,
+              preference_sort: existingPref.preference_sort,
+              default_preference: existingPref.default_preference,
+              defualt_sort: existingPref.defualt_sort,
+              hide_flag: newVisible, // API uses hide_flag: true = visible
+            },
+          ],
+        };
+
+        console.log(`[${tabName}] Upsert payload:`, JSON.stringify(updatePayload, null, 2));
+
+        try {
+          setIsSavingPreferences(true);
+          const toastId = toast.loading("Updating column visibility...");
+
+          // Serialization lock
+          if ((window as any).__isSavingToDatabricks) {
+            while ((window as any).__isSavingToDatabricks) {
+              await new Promise((r) => setTimeout(r, 300));
+            }
+          }
+          (window as any).__isSavingToDatabricks = true;
+
+          const result = await upsertUserPreferences(updatePayload).unwrap();
+          console.log(`[${tabName}] Upsert response:`, result);
+          console.log(`[${tabName}] Column visibility updated for ${field} with hide_flag: ${newVisible}`);
+
+          // Cache invalidation via invalidatesTags should trigger automatic refetch
+          // No need for manual refetch - it can cause race conditions
+
+          toast.success("Column visibility updated!", { id: toastId });
+        } catch (error) {
+          console.error(`[${tabName}] Failed to update visibility:`, error);
+          toast.error("Failed to update column visibility.");
+          // Revert on error
+          setColumnVisibility((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(field, currentVisible);
+            return newMap;
+          });
+        } finally {
+          (window as any).__isSavingToDatabricks = false;
+          setIsSavingPreferences(false);
+        }
+      }
+    },
+    [columnVisibility, userPreferences, userId, endpoint, upsertUserPreferences, tabName]
+  );
+
+  // Update visibility for multiple columns at once
+  const updateColumnsVisibility = useCallback(
+    async (updates: { field: string; visible: boolean }[]) => {
+      console.log(`[${tabName}] Updating visibility for ${updates.length} columns:`, updates);
+
+      // Update local state immediately (optimistic update)
+      setColumnVisibility((prev) => {
+        const newMap = new Map(prev);
+        updates.forEach(({ field, visible }) => {
+          newMap.set(field, visible);
+        });
+        return newMap;
+      });
+
+      // CRITICAL: Clear currentColumnOrder when making columns visible
+      // This forces filteredColumns to recalculate from API data with updated visibility
+      const hasVisibleUpdates = updates.some(({ visible }) => visible);
+      if (hasVisibleUpdates) {
+        setCurrentColumnOrder([]);
+        console.log(`[${tabName}] Cleared currentColumnOrder to ensure columns appear`);
+      }
+
+      // Prepare API payload - update all affected columns
+      const prefsData = (userPreferences as any)?.data || [];
+      const updatePayloads = updates
+        .map(({ field, visible }) => {
+          const existingPref = prefsData.find((p: any) => p.preference === field);
+          if (existingPref) {
+            return {
+              user_id: userId,
+              endpoint: endpoint,
+              preference: field,
+              preference_sort: existingPref.preference_sort,
+              default_preference: existingPref.default_preference,
+              defualt_sort: existingPref.defualt_sort,
+              hide_flag: visible, // API uses hide_flag: true = visible
+            };
+          }
+          return null;
+        })
+        .filter(Boolean);
+
+      if (updatePayloads.length > 0) {
+        console.log(`[${tabName}] Upsert payload for multiple columns:`, JSON.stringify({ data: updatePayloads }, null, 2));
+
+        try {
+          setIsSavingPreferences(true);
+          const toastId = toast.loading("Updating column visibility...");
+
+          // Serialization lock
+          if ((window as any).__isSavingToDatabricks) {
+            while ((window as any).__isSavingToDatabricks) {
+              await new Promise((r) => setTimeout(r, 300));
+            }
+          }
+          (window as any).__isSavingToDatabricks = true;
+
+          const result = await upsertUserPreferences({ data: updatePayloads }).unwrap();
+          console.log(`[${tabName}] Upsert response:`, result);
+          console.log(`[${tabName}] Column visibility updated for ${updates.length} columns`);
+
+          // Cache invalidation via invalidatesTags should trigger automatic refetch
+          // No need for manual refetch - it can cause race conditions
+
+          toast.success("Column visibility updated!", { id: toastId });
+        } catch (error) {
+          console.error(`[${tabName}] Failed to update visibility:`, error);
+          toast.error("Failed to update column visibility.");
+          // Revert on error
+          setColumnVisibility((prev) => {
+            const newMap = new Map(prev);
+            updates.forEach(({ field }) => {
+              const originalPref = prefsData.find((p: any) => p.preference === field);
+              if (originalPref) {
+                newMap.set(field, originalPref.hide_flag === true);
+              }
+            });
+            return newMap;
+          });
+        } finally {
+          (window as any).__isSavingToDatabricks = false;
+          setIsSavingPreferences(false);
+        }
+      }
+    },
+    [userPreferences, userId, endpoint, upsertUserPreferences, tabName]
   );
 
   // Set activeTabName when component mounts (skip for nested components)
@@ -358,6 +686,7 @@ export const useColumnPreferences = ({
       // Clear state
       setCurrentColumnOrder([]);
       setDefaultPreferences(new Map());
+      setColumnVisibility(new Map());
       // Reset refs to allow new column moves
       lastProcessedSignatureRef.current = "";
       lastSavedOrderRef.current = "";
@@ -454,6 +783,7 @@ export const useColumnPreferences = ({
       // Clear state
       setCurrentColumnOrder([]);
       setDefaultPreferences(new Map());
+      setColumnVisibility(new Map());
       // Reset refs to allow new column moves
       lastProcessedSignatureRef.current = "";
       lastSavedOrderRef.current = "";
@@ -565,6 +895,7 @@ export const useColumnPreferences = ({
       // Clear state
       setCurrentColumnOrder([]);
       setDefaultPreferences(new Map());
+      setColumnVisibility(new Map());
       // Reset refs to allow new column moves
       lastProcessedSignatureRef.current = "";
       lastSavedOrderRef.current = "";
@@ -639,6 +970,7 @@ export const useColumnPreferences = ({
       // Clear state
       setCurrentColumnOrder([]);
       setDefaultPreferences(new Map());
+      setColumnVisibility(new Map());
       // Reset refs to allow new column moves
       lastProcessedSignatureRef.current = "";
       lastSavedOrderRef.current = "";
@@ -693,7 +1025,7 @@ export const useColumnPreferences = ({
     if (userPreferences && (userPreferences as any)?.data) {
       const prefsData = (userPreferences as any).data;
 
-      // Map through the API data and set preference_sort = defualt_sort
+      // Map through the API data and set preference_sort = defualt_sort, reset hide_flag to false (visible)
       const defaultPreferencesData = prefsData.map((pref: any) => ({
         user_id: userId,
         endpoint: endpoint,
@@ -701,7 +1033,14 @@ export const useColumnPreferences = ({
         preference_sort: pref.defualt_sort, // Reset to default sort value
         default_preference: pref.default_preference,
         defualt_sort: pref.defualt_sort,
+        hide_flag: true, // Reset all columns to visible (hide_flag: true = visible)
       }));
+
+      // Reset column visibility state to all visible
+      const resetVisibility = new Map<string, boolean>(
+        prefsData.map((pref: any) => [pref.preference, true])
+      );
+      setColumnVisibility(resetVisibility);
 
       console.log(
         `[${tabName}]  Resetting preference_sort to defualt_sort:`,
@@ -822,9 +1161,13 @@ export const useColumnPreferences = ({
 
   return {
     filteredColumns,
+    allColumnsWithVisibility,
     handleColumnMoved,
     handleResetColumns,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
     storageKey,
     isLoading: isUpsertLoading,
+    isSaving: isSavingPreferences,
   };
 };

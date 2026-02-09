@@ -87,12 +87,20 @@ const Return = ({ customer_id }: Props) => {
 
   //   return orderedColumns;
   // }, [userPreferences]);
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "orders_return",
-      tabName: "returns",
-      defaultColumns: Returns,
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "orders_return",
+    tabName: "returns",
+    defaultColumns: Returns,
+  });
   const columns = useReturnColumn(filteredColumns);
 
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
@@ -165,6 +173,10 @@ const Return = ({ customer_id }: Props) => {
           onColumnMoved={handleColumnMoved}
           onResetColumns={handleResetColumns}
           storageKey={storageKey}
+          allColumnsWithVisibility={allColumnsWithVisibility}
+          onToggleColumnVisibility={toggleColumnVisibility}
+          onUpdateColumnsVisibility={updateColumnsVisibility}
+          isVisibilityLoading={isSaving}
         />
       )}
     </Box>

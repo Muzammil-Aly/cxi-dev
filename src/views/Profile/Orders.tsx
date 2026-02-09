@@ -64,12 +64,20 @@ import CircularLoader from "@/components/Common/CustomSearch/CircularLoader";
 
 const Orders = ({ customerId }: { customerId?: string }) => {
   // Use column preferences hook
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "customer_orders",
-      tabName: "Orders",
-      defaultColumns: orders,
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "customer_orders",
+    tabName: "Orders",
+    defaultColumns: orders,
+  });
   const userId =
     typeof window !== "undefined"
       ? getUserInfo()?.user_id || undefined
@@ -1292,6 +1300,10 @@ const Orders = ({ customerId }: { customerId?: string }) => {
               paginationPageSize={pageSize}
               onColumnMoved={handleColumnMoved}
               onResetColumns={handleResetColumns}
+              allColumnsWithVisibility={allColumnsWithVisibility}
+              onToggleColumnVisibility={toggleColumnVisibility}
+              onUpdateColumnsVisibility={updateColumnsVisibility}
+              isVisibilityLoading={isSaving}
               filters={{
                 orderIdFilter,
                 customerIdFilter,

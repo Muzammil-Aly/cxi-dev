@@ -73,14 +73,22 @@ const InventoryQTYtwo: React.FC<InventoryQTYtwo> = ({
 
   //   return orderedColumns;
   // }, [userPreferences]);
-  const { filteredColumns, handleColumnMoved, handleResetColumns, storageKey } =
-    useColumnPreferences({
-      endpoint: "qty_available_pop_up2",
-      tabName: "InventoryQTYtwo",
-      defaultColumns: qty_two,
-      disableTabManagement: false,
-      parentTabName: "Inventory",
-    });
+  const {
+    filteredColumns,
+    handleColumnMoved,
+    handleResetColumns,
+    storageKey,
+    allColumnsWithVisibility,
+    toggleColumnVisibility,
+    updateColumnsVisibility,
+    isSaving,
+  } = useColumnPreferences({
+    endpoint: "qty_available_pop_up2",
+    tabName: "InventoryQTYtwo",
+    defaultColumns: qty_two,
+    disableTabManagement: false,
+    parentTabName: "Inventory",
+  });
   // Apply column customization
   const tiCol = useQTYtwo(filteredColumns);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
@@ -262,6 +270,10 @@ const InventoryQTYtwo: React.FC<InventoryQTYtwo> = ({
             onColumnMoved={handleColumnMoved}
             onResetColumns={handleResetColumns}
             storageKey={storageKey}
+            allColumnsWithVisibility={allColumnsWithVisibility}
+            onToggleColumnVisibility={toggleColumnVisibility}
+            onUpdateColumnsVisibility={updateColumnsVisibility}
+            isVisibilityLoading={isSaving}
           />
         )}
       </Paper>
