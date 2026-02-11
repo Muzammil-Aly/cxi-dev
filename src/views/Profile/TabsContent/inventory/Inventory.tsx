@@ -92,6 +92,7 @@ const Inventory = () => {
   const { data, isLoading, isFetching } = useGetInventoryQuery({
     page,
     page_size: pageSize,
+    source: "inventory",
     // location_code: locationCodeFilter || undefined,
     location_code: locationCodeFilter?.length ? locationCodeFilter : undefined,
     item_no: ItemNoFilter || undefined,
@@ -493,6 +494,7 @@ const Inventory = () => {
           <Touchups
             shouldFilterNull={false}
             setSelectedTouchupItemNo={handleSelectOrderItem}
+            source="inventory"
           />
         </Paper>
 
@@ -507,7 +509,7 @@ const Inventory = () => {
             ml: 5,
           }}
         >
-          <ItemTrackingComments />
+          <ItemTrackingComments source="inventory" />
         </Paper>
 
         {/* Touchups Pens */}
@@ -522,7 +524,7 @@ const Inventory = () => {
             ml: 5,
           }}
         >
-          <TouchupsPens shouldFilterNull={false} />
+          <TouchupsPens shouldFilterNull={false} source="inventory" />
         </Paper>
       </ResponsiveGridLayout>
 

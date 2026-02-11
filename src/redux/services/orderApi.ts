@@ -1,26 +1,9 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { getAccessToken } from "@/utils/auth";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { baseQueryWithReauth } from "../baseQueryWithReauth";
 
 export const orderApi = createApi({
   reducerPath: "orderApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
-    prepareHeaders: (headers) => {
-      // Try to get JWT token first
-      const jwtToken = getAccessToken();
-      if (jwtToken) {
-        headers.set("Authorization", `Bearer ${jwtToken}`);
-      } else {
-        // Fallback to Databricks PAT for backwards compatibility
-        const token = process.env.NEXT_PUBLIC_DATABRICKS_PAT;
-        if (token) {
-          headers.set("Authorization", `Bearer ${token}`);
-        }
-      }
-      headers.set("Content-Type", "application/json");
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
     getCustomerOrders: builder.query<
       any,
@@ -49,6 +32,7 @@ export const orderApi = createApi({
       query: ({
         page = 1,
         page_size = 10,
+        source,
         order_id,
         customer_id,
         customer_name,
@@ -69,6 +53,7 @@ export const orderApi = createApi({
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
         if (order_id) params.set("order_id", order_id);
         if (customer_id) params.set("customer_id", customer_id);
         if (customer_name) params.set("customer_name", customer_name);
@@ -92,8 +77,9 @@ export const orderApi = createApi({
       },
     }),
 
-    getOrderItems: builder.query<any, { orderId: string }>({
-      query: ({ orderId }) => `customer_order_items?order_id=${orderId}`,
+    getOrderItems: builder.query<any, { orderId: string; source?: string }>({
+      query: ({ orderId, source }) =>
+        `customer_order_items?order_id=${orderId}&source=${source || "orders"}`,
     }),
 
     getReturns: builder.query<any, { customer_id: string }>({

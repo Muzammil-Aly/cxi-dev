@@ -1,26 +1,9 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { getAccessToken } from "@/utils/auth";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { baseQueryWithReauth } from "../baseQueryWithReauth";
 
 export const customerApi = createApi({
   reducerPath: "customerApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
-    prepareHeaders: (headers) => {
-      // Try to get JWT token first
-      const jwtToken = getAccessToken();
-      if (jwtToken) {
-        headers.set("Authorization", `Bearer ${jwtToken}`);
-      } else {
-        // Fallback to Databricks PAT for backwards compatibility
-        const token = process.env.NEXT_PUBLIC_DATABRICKS_PAT;
-        if (token) {
-          headers.set("Authorization", `Bearer ${token}`);
-        }
-      }
-      headers.set("Content-Type", "application/json");
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithReauth,
   tagTypes: ["UserPreferences"],
   endpoints: (builder) => ({
     getProfiles: builder.query<
@@ -37,6 +20,7 @@ export const customerApi = createApi({
         key?: string;
         created_at?: string;
         last_order_date?: string;
+        tab?: string;
       }
     >({
       query: ({
@@ -51,6 +35,7 @@ export const customerApi = createApi({
         key,
         created_at,
         last_order_date,
+        tab,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
@@ -64,6 +49,7 @@ export const customerApi = createApi({
         if (key) params.set("key", key);
         if (created_at) params.set("created_at", created_at);
         if (last_order_date) params.set("last_order_date", last_order_date);
+        if (tab) params.set("tab", tab);
 
         return `/customer_profiles/?${params.toString()}`;
       },

@@ -28,6 +28,7 @@ interface Props {
   Colorslug?: string | null;
   /** 👇 Add this to decide behavior when Colorslug is null */
   shouldFilterNull?: boolean; // true = fetch null colors, false = fetch all
+  source?: string; // Track which tab is calling: "orders" | "inventory"
 }
 
 interface Touchup {
@@ -43,6 +44,7 @@ const TouchupsPens: React.FC<Props> = ({
   orderId,
   Colorslug,
   shouldFilterNull = false, // default: show all when Colorslug is null
+  source,
 }) => {
   const { isTouchupPensOpen } = useSelector((state: RootState) => state.tab);
 
@@ -140,6 +142,7 @@ const TouchupsPens: React.FC<Props> = ({
     page_size: pageSizeInput,
     color_name: filters.ColorName,
     item_name2: filters.ItemName2,
+    source, // Track source for activity logging
     ...((Colorslug ?? filters.Colorslug)
       ? { color_slug: Colorslug ?? filters.Colorslug }
       : shouldFilterNull

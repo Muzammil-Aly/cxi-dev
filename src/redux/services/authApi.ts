@@ -142,6 +142,76 @@ interface UserInteractionRequest {
   page_size?: number;
 }
 
+// Session types
+interface Session {
+  logout_type: string;
+  session_id: string;
+  user_id: string;
+  login_time: string;
+  logout_time: string | null;
+  duration_minutes: number | null;
+  ip_address: string;
+  user_agent: string;
+}
+
+interface SessionsResponse {
+  status: number;
+  system_status: number;
+  data: {
+    user_id: string;
+    sessions: Session[];
+    total: number;
+    page: number;
+    page_size: number;
+  };
+  message: string;
+  system_error_message: string;
+}
+
+interface SessionsRequest {
+  user_id: string;
+  page?: number;
+  page_size?: number;
+  login_from?: string;
+  login_to?: string;
+}
+
+interface SessionInteraction {
+  id: string;
+  user_id: string;
+  session_id: string;
+  endpoint: string;
+  http_method: string;
+  query_params: string;
+  response_status: number;
+  execution_time_ms: number;
+  ip_address: string;
+  user_agent: string;
+  created_at: string;
+}
+
+interface SessionInteractionsResponse {
+  status: number;
+  system_status: number;
+  data: {
+    user_id: string;
+    session_id: string;
+    interactions: SessionInteraction[];
+    total: number;
+    page: number;
+    page_size: number;
+  };
+  message: string;
+  system_error_message: string;
+}
+
+interface SessionInteractionsRequest {
+  user_id: string;
+  session_id: string;
+  page?: number;
+  page_size?: number;
+}
+
 export const authApi = createApi({
   reducerPath: "authApi",
   baseQuery: fetchBaseQuery({
@@ -188,7 +258,14 @@ export const authApi = createApi({
       query: () => `/cxi_users?page_size=100`,
     }),
     getUserActivity: builder.query<UserActivityResponse, UserActivityRequest>({
-      query: ({ user_id, activity_type, created_from, created_to, page = 1, page_size = 10 }) => {
+      query: ({
+        user_id,
+        activity_type,
+        created_from,
+        created_to,
+        page = 1,
+        page_size = 10,
+      }) => {
         const params = new URLSearchParams();
         params.append("user_id", user_id);
         if (activity_type) params.append("activity_type", activity_type);
@@ -199,8 +276,19 @@ export const authApi = createApi({
         return `/tracking/user_activity?${params.toString()}`;
       },
     }),
-    getUserInteraction: builder.query<UserInteractionResponse, UserInteractionRequest>({
-      query: ({ user_id, endpoint, http_method, created_from, created_to, page = 1, page_size = 10 }) => {
+    getUserInteraction: builder.query<
+      UserInteractionResponse,
+      UserInteractionRequest
+    >({
+      query: ({
+        user_id,
+        endpoint,
+        http_method,
+        created_from,
+        created_to,
+        page = 1,
+        page_size = 10,
+      }) => {
         const params = new URLSearchParams();
         params.append("user_id", user_id);
         if (endpoint) params.append("endpoint", endpoint);
@@ -210,6 +298,30 @@ export const authApi = createApi({
         params.append("page", page.toString());
         params.append("page_size", page_size.toString());
         return `/tracking/user_interaction?${params.toString()}`;
+      },
+    }),
+    getSessions: builder.query<SessionsResponse, SessionsRequest>({
+      query: ({ user_id, page = 1, page_size = 20, login_from, login_to }) => {
+        const params = new URLSearchParams();
+        params.append("user_id", user_id);
+        if (login_from) params.append("login_from", login_from);
+        if (login_to) params.append("login_to", login_to);
+        params.append("page", page.toString());
+        params.append("page_size", page_size.toString());
+        return `/sessions?${params.toString()}`;
+      },
+    }),
+    getSessionInteractions: builder.query<
+      SessionInteractionsResponse,
+      SessionInteractionsRequest
+    >({
+      query: ({ user_id, session_id, page = 1, page_size = 50 }) => {
+        const params = new URLSearchParams();
+        params.append("user_id", user_id);
+        params.append("session_id", session_id);
+        params.append("page", page.toString());
+        params.append("page_size", page_size.toString());
+        return `/sessions/interactions?${params.toString()}`;
       },
     }),
   }),
@@ -222,4 +334,6 @@ export const {
   useGetCxiUsersQuery,
   useGetUserActivityQuery,
   useGetUserInteractionQuery,
+  useGetSessionsQuery,
+  useGetSessionInteractionsQuery,
 } = authApi;

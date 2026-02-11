@@ -30,6 +30,7 @@ interface Props {
   shouldFilterNull?: boolean;
   setSelectedTouchup?: React.Dispatch<React.SetStateAction<Touchup | null>>;
   setSelectedTouchupItemNo?: React.Dispatch<React.SetStateAction<any | null>>;
+  source?: string; // Track which tab is calling: "orders" | "inventory"
 }
 
 interface Touchup {
@@ -54,6 +55,7 @@ const Touchups = ({
   shouldFilterNull = false,
   setSelectedTouchup,
   setSelectedTouchupItemNo,
+  source,
 }: Props) => {
   const { isActive, activeTabName, isTouchupPensOpen, isTouchupsOpen } =
     useSelector((state: RootState) => state.tab);
@@ -148,6 +150,7 @@ const Touchups = ({
     sku: filters.sku || sku || undefined,
     color_slug: filters.color_slug || undefined,
     parts_item_name_2: filters.parts_item_name_2 || undefined,
+    source, // Track source for activity logging
 
     ...((filters.lot_no ?? lotNo)
       ? { lot_no: filters.lot_no ?? lotNo }

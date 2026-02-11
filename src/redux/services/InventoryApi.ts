@@ -1,26 +1,9 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { getAccessToken } from "@/utils/auth";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { baseQueryWithReauth } from "../baseQueryWithReauth";
 
 export const inventoryApi = createApi({
   reducerPath: "inventoryApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
-    prepareHeaders: (headers) => {
-      // Try to get JWT token first
-      const jwtToken = getAccessToken();
-      if (jwtToken) {
-        headers.set("Authorization", `Bearer ${jwtToken}`);
-      } else {
-        // Fallback to Databricks PAT for backwards compatibility
-        const token = process.env.NEXT_PUBLIC_DATABRICKS_PAT;
-        if (token) {
-          headers.set("Authorization", `Bearer ${token}`);
-        }
-      }
-      headers.set("Content-Type", "application/json");
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
     getLocationCodes: builder.query<any, string | void>({
       query: (name = "") => ({
@@ -40,6 +23,7 @@ export const inventoryApi = createApi({
         page_size?: number;
         location_code?: string;
         item_no?: string;
+        source?: string;
       }
     >({
       query: ({
@@ -51,10 +35,12 @@ export const inventoryApi = createApi({
         qty_commited,
         location_code,
         item_no,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
         if (document_no) params.set("document_no", document_no);
         if (qty) params.set("qty", qty);
         if (customer_name) params.set("customer_name", customer_name);
@@ -76,6 +62,7 @@ export const inventoryApi = createApi({
         expected_receipt_date?: string;
         page?: number;
         page_size?: number;
+        source?: string;
       }
     >({
       query: ({
@@ -85,10 +72,12 @@ export const inventoryApi = createApi({
         item_no,
         shipment_status,
         expected_receipt_date,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
         if (shipment_status) params.set("shipment_status", shipment_status);
         if (expected_receipt_date)
           params.set("expected_receipt_date", expected_receipt_date);
@@ -111,6 +100,7 @@ export const inventoryApi = createApi({
         blocked?: string;
         page?: number;
         page_size?: number;
+        source?: string;
       }
     >({
       query: ({
@@ -121,10 +111,12 @@ export const inventoryApi = createApi({
         test_quality,
         lot_no,
         blocked,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
 
         if (item_no) params.set("item_no", item_no);
         if (location_code) params.set("location_code", location_code);
@@ -149,6 +141,7 @@ export const inventoryApi = createApi({
         page?: number;
         page_size?: number;
         bin_code?: string;
+        source?: string;
       }
     >({
       query: ({
@@ -161,10 +154,12 @@ export const inventoryApi = createApi({
         zone_code,
         lot_no,
         bin_code,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
 
         if (item_no) params.set("item_no", item_no);
         if (description) params.set("description", description);
@@ -196,6 +191,7 @@ export const inventoryApi = createApi({
         page?: number;
         page_size?: number;
         life_cycle_status_code?: string;
+        source?: string;
       }
     >({
       query: ({
@@ -211,12 +207,15 @@ export const inventoryApi = createApi({
         life_cycle_status_code,
         page = 1,
         page_size = 10,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
 
-        if (item_no) params.set("item_no", item_no);
+        if (item_no) params.set("item_no", `like:${item_no}`);
+
         if (Array.isArray(location_code) && location_code.length > 0) {
           params.set("location_code", location_code.join(","));
         } else if (location_code) {
@@ -250,13 +249,14 @@ export const inventoryApi = createApi({
 
     getLocationItemLot: builder.query<
       any,
-      { sku: string; page?: number; page_size?: number }
+      { sku: string; page?: number; page_size?: number; source?: string }
     >({
-      query: ({ sku, page = 1, page_size = 10 }) => {
+      query: ({ sku, page = 1, page_size = 10, source }) => {
         const params = new URLSearchParams();
 
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
         if (sku) params.set("item_no", sku);
 
         return `/location_item_lot?${params.toString()}`;
@@ -265,12 +265,13 @@ export const inventoryApi = createApi({
 
     getNavETA: builder.query<
       any,
-      { sku: string; page?: number; page_size?: number }
+      { sku: string; page?: number; page_size?: number; source?: string }
     >({
-      query: ({ sku, page = 1, page_size = 10 }) => {
+      query: ({ sku, page = 1, page_size = 10, source }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
         if (sku) params.set("item_no", sku);
 
         return `/nav_eta?${params.toString()}`;
@@ -291,6 +292,7 @@ export const inventoryApi = createApi({
         page?: number;
         page_size?: number;
         isFromProps?: boolean;
+        source?: string;
       }
     >({
       query: ({
@@ -303,10 +305,12 @@ export const inventoryApi = createApi({
         page = 1,
         page_size = 10,
         isFromProps = false,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
 
         if (item_no)
           params.set("item_no", isFromProps ? item_no : `like:${item_no}`);
@@ -345,6 +349,7 @@ export const inventoryApi = createApi({
         color_name?: string;
         parts_version?: string;
         isFromProps?: boolean;
+        source?: string;
       }
     >({
       query: ({
@@ -364,10 +369,12 @@ export const inventoryApi = createApi({
         color_name,
         parts_version,
         isFromProps = false,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
         if (order_id) params.set("order_id", order_id);
         // if (lot_no !== undefined) params.set("lot_no", lot_no ?? "");
         // if (lot_no) params.set("lot_no", lot_no);
@@ -406,6 +413,7 @@ export const inventoryApi = createApi({
         sku?: string;
         QtyAvailable?: string;
         isFromProps?: boolean;
+        source?: string;
       }
     >({
       query: ({
@@ -419,10 +427,12 @@ export const inventoryApi = createApi({
         sku,
         QtyAvailable,
         isFromProps = false,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
 
         // if (color_slug) params.set("Colorslug", color_slug);
         if (color_slug)

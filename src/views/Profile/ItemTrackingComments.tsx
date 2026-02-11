@@ -30,12 +30,14 @@ interface Props {
   orderItemSec?: boolean;
   filters?: string;
   shouldFilterNull?: boolean;
+  source?: string; // Track which tab is calling: "orders" | "inventory"
 }
 
 const ItemTrackingComments = ({
   sku,
   lotNo,
   shouldFilterNull = false,
+  source,
 }: Props) => {
   const isNestedComponent = !!lotNo || !!sku;
   const [refetchKey, setRefetchKey] = useState<number>(0);
@@ -125,6 +127,7 @@ const ItemTrackingComments = ({
       ? filters.transaction_specification
       : undefined,
     isFromProps: !filters.item_no && !!sku, // true when using sku prop, false when searching
+    source, // Track source for activity logging
   };
 
   const { data, isLoading, isFetching } =

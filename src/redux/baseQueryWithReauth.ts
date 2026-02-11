@@ -11,6 +11,7 @@ import {
   clearAuthData,
   shouldRefreshToken,
 } from "@/utils/auth";
+import toast from "react-hot-toast";
 
 const baseQuery = fetchBaseQuery({
   baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
@@ -57,6 +58,16 @@ export const baseQueryWithReauth: BaseQueryFn<
 
   // Make the original request
   let result = await baseQuery(args, api, extraOptions);
+
+  // If we get a 403, session has expired - clear auth and redirect to sign-in
+  if (result.error && result.error.status === 403) {
+    clearAuthData();
+    toast.error("Session has been expired");
+    if (typeof window !== "undefined") {
+      window.location.href = "/sign-in";
+    }
+    return result;
+  }
 
   // If we get a 401, try to refresh the token
   if (result.error && result.error.status === 401) {

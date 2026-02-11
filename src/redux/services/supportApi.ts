@@ -1,26 +1,9 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { getAccessToken } from "@/utils/auth";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { baseQueryWithReauth } from "../baseQueryWithReauth";
 
 export const supportApi = createApi({
   reducerPath: "supportApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
-    prepareHeaders: (headers) => {
-      // Try to get JWT token first
-      const jwtToken = getAccessToken();
-      if (jwtToken) {
-        headers.set("Authorization", `Bearer ${jwtToken}`);
-      } else {
-        // Fallback to Databricks PAT for backwards compatibility
-        const token = process.env.NEXT_PUBLIC_DATABRICKS_PAT;
-        if (token) {
-          headers.set("Authorization", `Bearer ${token}`);
-        }
-      }
-      headers.set("Content-Type", "application/json");
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
     getSupportTickets: builder.query<
       any,
@@ -35,6 +18,7 @@ export const supportApi = createApi({
         status?: string;
         tags?: string;
         created_at?: string;
+        source?: string;
       }
     >({
       query: ({
@@ -48,10 +32,12 @@ export const supportApi = createApi({
         status,
         tags,
         created_at,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
         if (customer_id) params.set("customer_id", customer_id);
         if (ticket_id) params.set("ticket_id", ticket_id);
         if (customer_name) params.set("customer_name", customer_name);

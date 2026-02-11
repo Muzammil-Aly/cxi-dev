@@ -185,6 +185,7 @@ const OrdersTable: React.FC<OrdersTableProps> = ({ customerId, orderId }) => {
     order_id: orderId,
     page: 1,
     page_size: 10,
+    source: "orders",
   });
 
   if (isLoading || isFetching) {

@@ -16,21 +16,19 @@ import {
   Select,
   MenuItem,
   InputLabel,
-  Tabs,
-  Tab,
 } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import CloseIcon from "@mui/icons-material/Close";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
-import ErrorIcon from "@mui/icons-material/Error";
-import ComputerIcon from "@mui/icons-material/Computer";
 import dayjs, { Dayjs } from "dayjs";
 import {
-  useGetUserActivityQuery,
   useGetCxiUsersQuery,
-  useGetUserInteractionQuery,
+  useGetSessionsQuery,
+  useGetSessionInteractionsQuery,
 } from "@/redux/services/authApi";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
+import LoginIcon from "@mui/icons-material/Login";
 import CustomDateRangePicker from "@/components/Common/DatePicker/CustomDateRangePicker";
 
 interface UserActivityLogProps {
@@ -48,32 +46,6 @@ const COLORS = {
   textSecondary: "#6B7280",
   accent: "#4F46E5",
   accentHover: "#4338CA",
-};
-
-const getActivityIcon = (type: string) => {
-  switch (type) {
-    case "LOGIN_SUCCESS":
-      return <CheckCircleIcon sx={{ color: "#10b981", fontSize: 20 }} />;
-    case "LOGOUT":
-      return <LogoutIcon sx={{ color: "#f59e0b", fontSize: 20 }} />;
-    case "LOGIN_FAILED":
-      return <ErrorIcon sx={{ color: "#ef4444", fontSize: 20 }} />;
-    default:
-      return <ComputerIcon sx={{ color: "#6366f1", fontSize: 20 }} />;
-  }
-};
-
-const getActivityColor = (type: string) => {
-  switch (type) {
-    case "LOGIN_SUCCESS":
-      return { bg: "rgba(16, 185, 129, 0.1)", color: "#10b981" };
-    case "LOGOUT":
-      return { bg: "rgba(245, 158, 11, 0.1)", color: "#f59e0b" };
-    case "LOGIN_FAILED":
-      return { bg: "rgba(239, 68, 68, 0.1)", color: "#ef4444" };
-    default:
-      return { bg: "rgba(99, 102, 241, 0.1)", color: "#6366f1" };
-  }
 };
 
 const getMethodColor = (method: string) => {
@@ -113,22 +85,119 @@ const formatDate = (dateString: string | null) => {
 };
 
 const parseUserAgent = (ua: string) => {
+  if (ua.includes("Chrome") && ua.includes("Edg")) return "Edge";
   if (ua.includes("Chrome")) return "Chrome";
   if (ua.includes("Firefox")) return "Firefox";
   if (ua.includes("Safari")) return "Safari";
-  if (ua.includes("Edge")) return "Edge";
   if (ua.includes("Postman")) return "Postman";
   return "Unknown Browser";
 };
 
-const PAGE_SIZE_OPTIONS = [10, 25, 50];
+const formatDuration = (minutes: number | null) => {
+  if (minutes === null) return "Ongoing";
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours}h ${mins}m`;
+};
+
+const truncateSessionId = (sessionId: string) => {
+  if (sessionId.length <= 16) return sessionId;
+  return `${sessionId.slice(0, 8)}...${sessionId.slice(-8)}`;
+};
+
+// const parseQueryParams = (queryParams: string | null) => {
+//   if (!queryParams) return { tab: "-", params: "-" };
+
+//   try {
+//     // Try JSON format first
+//     const parsed = JSON.parse(queryParams);
+//     const tab = parsed.source || "-";
+//     const entries = Object.entries(parsed)
+//       .filter(
+//         ([key]) => key !== "source" && key !== "page" && key !== "page_size",
+//       )
+//       .filter(
+//         ([, value]) =>
+//           value !== undefined &&
+//           value !== null &&
+//           value !== "null" &&
+//           value !== "",
+//       )
+//       .map(([key, value]) => `${key}=${value}`);
+//     return { tab, params: entries.length > 0 ? entries.join(" | ") : "-" };
+//   } catch {
+//     // Fallback: URL query string format
+//     const decoded = decodeURIComponent(queryParams.replace(/\+/g, " "));
+//     const parts = decoded.split("&");
+//     let tab = "-";
+//     const filtered = parts.filter((param) => {
+//       if (param.startsWith("source=") || param.startsWith("tab")) {
+//         tab = param.split("=")[1] || "-";
+//         return false;
+//       }
+//       if (param.startsWith("page=") || param.startsWith("page_size="))
+//         return false;
+//       return true;
+//     });
+//     return { tab, params: filtered.length > 0 ? filtered.join(" | ") : "-" };
+//   }
+// };
+const parseQueryParams = (queryParams: string | null) => {
+  if (!queryParams) return { tab: "-", params: "-" };
+
+  try {
+    // Try JSON format first
+    const parsed = JSON.parse(queryParams);
+
+    // Pick both tab and source if they exist
+    const tabParts: string[] = [];
+    if (parsed.tab) tabParts.push(parsed.tab);
+    if (parsed.source) tabParts.push(parsed.source);
+
+    const tab = tabParts.length > 0 ? tabParts.join(" / ") : "-";
+
+    const entries = Object.entries(parsed)
+      .filter(
+        ([key]) =>
+          key !== "source" &&
+          key !== "tab" &&
+          key !== "page" &&
+          key !== "page_size",
+      )
+      .filter(
+        ([, value]) =>
+          value !== undefined &&
+          value !== null &&
+          value !== "null" &&
+          value !== "",
+      )
+      .map(([key, value]) => `${key}=${value}`);
+
+    return { tab, params: entries.length > 0 ? entries.join(" | ") : "-" };
+  } catch {
+    // Fallback: URL query string format
+    const decoded = decodeURIComponent(queryParams.replace(/\+/g, " "));
+    const parts = decoded.split("&");
+    const tabParts: string[] = [];
+    const filtered = parts.filter((param) => {
+      if (param.startsWith("source=") || param.startsWith("tab=")) {
+        const [, value] = param.split("=");
+        if (value) tabParts.push(value);
+        return false;
+      }
+      if (param.startsWith("page=") || param.startsWith("page_size="))
+        return false;
+      return true;
+    });
+    const tab = tabParts.length > 0 ? tabParts.join(" / ") : "-";
+    return { tab, params: filtered.length > 0 ? filtered.join(" | ") : "-" };
+  }
+};
+
+const SESSION_PAGE_SIZE_OPTIONS = [10, 20, 50];
 
 const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
-  const [activeTab, setActiveTab] = useState(0);
-  const [activityPage, setActivityPage] = useState(1);
-  const [interactionPage, setInteractionPage] = useState(1);
-  const [activityPageSize, setActivityPageSize] = useState(10);
-  const [interactionPageSize, setInteractionPageSize] = useState(10);
   const currentUserId =
     typeof window !== "undefined" ? localStorage.getItem("userId") || "" : "";
   const [selectedUserId, setSelectedUserId] = useState(currentUserId);
@@ -137,6 +206,16 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
   const [startDate, setStartDate] = useState<Dayjs | null>(null);
   const [endDate, setEndDate] = useState<Dayjs | null>(null);
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
+
+  // Sessions state
+  const [sessionsPage, setSessionsPage] = useState(1);
+  const [sessionsPageSize, setSessionsPageSize] = useState(20);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
+    null,
+  );
+  const [sessionInteractionPage, setSessionInteractionPage] = useState(1);
+  const [sessionInteractionPageSize, setSessionInteractionPageSize] =
+    useState(50);
 
   // Fetch all users
   const { data: usersData, isLoading: usersLoading } = useGetCxiUsersQuery(
@@ -150,84 +229,93 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
   useEffect(() => {
     if (open && currentUserId) {
       setSelectedUserId(currentUserId);
-      setActivityPage(1);
-      setInteractionPage(1);
-      setActiveTab(0);
       // Reset date filter to empty
       setStartDate(null);
       setEndDate(null);
       setDateFilter(undefined);
+      // Reset sessions state
+      setSessionsPage(1);
+      setSelectedSessionId(null);
+      setSessionInteractionPage(1);
     }
   }, [open, currentUserId]);
 
   // Parse date filter for API queries
   const parsedDates = dateFilter?.split(",") || [];
-  const createdFrom = parsedDates[0] || undefined;
-  const createdTo = parsedDates[1] || undefined;
+  const loginFrom = parsedDates[0] || undefined;
+  const loginTo = parsedDates[1] || undefined;
 
-  // Activity query
+  // Sessions query
   const {
-    data: activityData,
-    isLoading: activityLoading,
-    isFetching: activityFetching,
-  } = useGetUserActivityQuery(
+    data: sessionsData,
+    isLoading: sessionsLoading,
+    isFetching: sessionsFetching,
+  } = useGetSessionsQuery(
     {
-      user_id: selectedUserId,
-      activity_type: "LOGIN_SUCCESS,LOGOUT,LOGIN_FAILED",
-      created_from: createdFrom,
-      created_to: createdTo,
-      page: activityPage,
-      page_size: activityPageSize,
+      user_id: selectedUserId || "",
+      page: sessionsPage,
+      page_size: sessionsPageSize,
+      login_from: loginFrom,
+      login_to: loginTo,
     },
-    { skip: !open || !selectedUserId || activeTab !== 0 },
+    { skip: !open || !selectedUserId },
   );
 
-  // Interaction query
+  // Session interactions query - when session is clicked
   const {
-    data: interactionData,
-    isLoading: interactionLoading,
-    isFetching: interactionFetching,
-  } = useGetUserInteractionQuery(
+    data: sessionInteractionsData,
+    isLoading: sessionInteractionsLoading,
+    isFetching: sessionInteractionsFetching,
+  } = useGetSessionInteractionsQuery(
     {
-      user_id: selectedUserId,
-      created_from: createdFrom,
-      created_to: createdTo,
-      page: interactionPage,
-      page_size: interactionPageSize,
+      user_id: selectedUserId || "",
+      session_id: selectedSessionId || "",
+      page: sessionInteractionPage,
+      page_size: sessionInteractionPageSize,
     },
-    { skip: !open || !selectedUserId || activeTab !== 1 },
+    { skip: !selectedSessionId || !selectedUserId },
   );
 
   const users = usersData?.data || [];
-  const activityRecords = activityData?.data?.records || [];
-  const activityPagination = activityData?.data?.pagination;
-  const interactionRecords = interactionData?.data?.records || [];
-  const interactionPagination = interactionData?.data?.pagination;
+  const sessions = sessionsData?.data?.sessions || [];
+  const totalSessions = sessionsData?.data?.total || 0;
+  const totalSessionPages = Math.ceil(totalSessions / sessionsPageSize);
+  const sessionInteractions = sessionInteractionsData?.data?.interactions || [];
+  const totalSessionInteractions = sessionInteractionsData?.data?.total || 0;
+  const totalSessionInteractionPages = Math.ceil(
+    totalSessionInteractions / sessionInteractionPageSize,
+  );
 
   const handleUserChange = (userId: string) => {
     setSelectedUserId(userId);
-    setActivityPage(1);
-    setInteractionPage(1);
+    setSessionsPage(1);
+    setSelectedSessionId(null);
+    setSessionInteractionPage(1);
   };
 
   // Handler for resetting pages when date changes (used by CustomDateRangePicker)
   const handleDatePageReset = (page: number) => {
-    setActivityPage(page);
-    setInteractionPage(page);
+    setSessionsPage(page);
   };
 
-  const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
-    setActiveTab(newValue);
+  // Sessions handlers
+  const handleSessionClick = (sessionId: string) => {
+    setSelectedSessionId(sessionId);
+    setSessionInteractionPage(1);
   };
 
-  const handleActivityPageSizeChange = (size: number) => {
-    setActivityPageSize(size);
-    setActivityPage(1);
+  const handleBackToSessions = () => {
+    setSelectedSessionId(null);
   };
 
-  const handleInteractionPageSizeChange = (size: number) => {
-    setInteractionPageSize(size);
-    setInteractionPage(1);
+  const handleSessionsPageSizeChange = (size: number) => {
+    setSessionsPageSize(size);
+    setSessionsPage(1);
+  };
+
+  const handleSessionInteractionPageSizeChange = (size: number) => {
+    setSessionInteractionPageSize(size);
+    setSessionInteractionPage(1);
   };
 
   const selectStyles = {
@@ -292,22 +380,48 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
           pb: 2,
         }}
       >
-        <Box>
-          <Typography
-            variant="h5"
-            sx={{ fontWeight: 700, color: COLORS.textPrimary }}
-          >
-            Activity log
-          </Typography>
-          {selectedUserId && (
-            <Typography
-              sx={{ fontSize: "13px", color: COLORS.textSecondary, mt: 0.5 }}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          {/* Back button when viewing interactions */}
+          {selectedSessionId && (
+            <IconButton
+              onClick={handleBackToSessions}
+              sx={{
+                color: COLORS.textSecondary,
+                "&:hover": { bgcolor: COLORS.bgHover },
+              }}
             >
-              Viewing:{" "}
-              {users.find((u) => u.user_id === selectedUserId)?.user_name ||
-                selectedUserId}
-            </Typography>
+              <ArrowBackIcon />
+            </IconButton>
           )}
+          <Box>
+            <Typography
+              variant="h5"
+              sx={{ fontWeight: 700, color: COLORS.textPrimary }}
+            >
+              {selectedSessionId ? "Session Interactions" : "Activity log"}
+            </Typography>
+            {selectedSessionId ? (
+              <Typography
+                sx={{ fontSize: "13px", color: COLORS.textSecondary, mt: 0.5 }}
+              >
+                Session: {truncateSessionId(selectedSessionId)}
+              </Typography>
+            ) : (
+              selectedUserId && (
+                <Typography
+                  sx={{
+                    fontSize: "13px",
+                    color: COLORS.textSecondary,
+                    mt: 0.5,
+                  }}
+                >
+                  Viewing:{" "}
+                  {users.find((u) => u.user_id === selectedUserId)?.user_name ||
+                    selectedUserId}
+                </Typography>
+              )
+            )}
+          </Box>
         </Box>
         <IconButton
           onClick={onClose}
@@ -403,44 +517,11 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
           </Box>
         </Box>
 
-        {/* Tabs */}
-        <Box
-          sx={{
-            borderBottom: `1px solid ${COLORS.border}`,
-            bgcolor: COLORS.bgCard,
-          }}
-        >
-          <Tabs
-            value={activeTab}
-            onChange={handleTabChange}
-            sx={{
-              px: 2,
-              "& .MuiTab-root": {
-                color: COLORS.textSecondary,
-                textTransform: "none",
-                fontWeight: 500,
-                fontSize: "14px",
-                minHeight: 48,
-                "&.Mui-selected": {
-                  color: COLORS.accent,
-                  fontWeight: 600,
-                },
-              },
-              "& .MuiTabs-indicator": {
-                bgcolor: COLORS.accent,
-                height: 2,
-              },
-            }}
-          >
-            <Tab label="Login Activity" />
-            <Tab label="API Interactions" />
-          </Tabs>
-        </Box>
-
-        {/* Tab Content */}
-        {activeTab === 0 && (
+        {/* Sessions Content */}
+        {!selectedSessionId ? (
+          // Sessions List View
           <>
-            {activityLoading || activityFetching ? (
+            {sessionsLoading || sessionsFetching ? (
               <Box
                 sx={{
                   display: "flex",
@@ -454,13 +535,13 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
             ) : !selectedUserId ? (
               <Box sx={{ textAlign: "center", p: 6, bgcolor: COLORS.bgCard }}>
                 <Typography sx={{ color: COLORS.textSecondary }}>
-                  Please select a user to view activity
+                  Please select a user to view sessions
                 </Typography>
               </Box>
-            ) : activityRecords.length === 0 ? (
+            ) : sessions.length === 0 ? (
               <Box sx={{ textAlign: "center", p: 6, bgcolor: COLORS.bgCard }}>
                 <Typography sx={{ color: COLORS.textSecondary }}>
-                  No activity records found for this user
+                  No sessions found for this user
                 </Typography>
               </Box>
             ) : (
@@ -470,9 +551,7 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                   <Box
                     sx={{
                       display: "grid",
-                      gridTemplateColumns: "180px 1fr 150px 100px",
-                      // gridTemplateColumns: "180px 80px 1fr 80px 120px 1fr",
-
+                      gridTemplateColumns: "200px 180px 180px 100px 120px",
                       gap: 2,
                       px: 2,
                       py: 1.5,
@@ -488,7 +567,7 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                         textTransform: "uppercase",
                       }}
                     >
-                      Date and time
+                      Session ID
                     </Typography>
                     <Typography
                       sx={{
@@ -498,7 +577,7 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                         textTransform: "uppercase",
                       }}
                     >
-                      Event
+                      Login Time
                     </Typography>
                     <Typography
                       sx={{
@@ -508,7 +587,18 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                         textTransform: "uppercase",
                       }}
                     >
-                      IP Address
+                      Logout Time
+                    </Typography>
+
+                    <Typography
+                      sx={{
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        color: COLORS.textSecondary,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      Duration
                     </Typography>
                     <Typography
                       sx={{
@@ -518,101 +608,107 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                         textTransform: "uppercase",
                       }}
                     >
-                      Browser
+                      Logout Type
                     </Typography>
                   </Box>
-                  {activityRecords.map((record) => {
-                    const colors = getActivityColor(record.activity_type);
-                    return (
-                      <Box
-                        key={record.id}
-                        sx={{
-                          display: "grid",
-                          gridTemplateColumns: "180px 1fr 150px 100px",
-                          gap: 2,
-                          px: 2,
-                          py: 1.5,
-                          alignItems: "center",
-                          borderRadius: "8px",
-                          "&:hover": {
-                            bgcolor: COLORS.bgHover,
-                          },
-                        }}
-                      >
+
+                  {/* Session Rows */}
+                  {sessions.map((session) => (
+                    <Box
+                      key={session.session_id}
+                      onClick={() => handleSessionClick(session.session_id)}
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: "200px 180px 180px 100px 120px",
+                        gap: 2,
+                        px: 2,
+                        py: 1.5,
+                        alignItems: "center",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        "&:hover": {
+                          bgcolor: COLORS.bgHover,
+                        },
+                      }}
+                    >
+                      <Tooltip title={session.session_id} arrow>
                         <Typography
-                          sx={{ fontSize: "13px", color: COLORS.textSecondary }}
-                        >
-                          {formatDate(record.created_at)}
-                        </Typography>
-                        <Box
                           sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.5,
+                            fontSize: "13px",
+                            color: COLORS.accent,
+                            fontFamily: "monospace",
+                            fontWeight: 500,
                           }}
                         >
-                          <Box
-                            sx={{
-                              p: 0.75,
-                              borderRadius: "6px",
-                              bgcolor: colors.bg,
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
-                          >
-                            {getActivityIcon(record.activity_type)}
-                          </Box>
-                          <Box>
-                            <Typography
-                              sx={{
-                                fontSize: "14px",
-                                fontWeight: 500,
-                                color: COLORS.textPrimary,
-                              }}
-                            >
-                              {record.activity_type.replace(/_/g, " ")}
-                            </Typography>
-                            {record.failure_reason && (
-                              <Typography
-                                sx={{ fontSize: "12px", color: "#ef4444" }}
-                              >
-                                {record.failure_reason}
-                              </Typography>
-                            )}
-                          </Box>
-                          {record.revoked && (
-                            <Chip
-                              label="UNDO"
-                              size="small"
-                              sx={{
-                                bgcolor: "transparent",
-                                color: COLORS.accent,
-                                fontSize: "11px",
-                                fontWeight: 600,
-                                height: 24,
-                                cursor: "pointer",
-                                "&:hover": {
-                                  bgcolor: "rgba(79, 70, 229, 0.08)",
-                                },
-                              }}
-                            />
-                          )}
-                        </Box>
-                        <Typography
-                          sx={{ fontSize: "13px", color: COLORS.textSecondary }}
-                        >
-                          {record.ip_address}
+                          {truncateSessionId(session.session_id)}
                         </Typography>
+                      </Tooltip>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <LoginIcon sx={{ color: "#10b981", fontSize: 16 }} />
                         <Typography
                           sx={{ fontSize: "13px", color: COLORS.textSecondary }}
                         >
-                          {parseUserAgent(record.user_agent)}
+                          {formatDate(session.login_time)}
                         </Typography>
                       </Box>
-                    );
-                  })}
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        {session.logout_time ? (
+                          <>
+                            <LogoutIcon
+                              sx={{ color: "#f59e0b", fontSize: 16 }}
+                            />
+                            <Typography
+                              sx={{
+                                fontSize: "13px",
+                                color: COLORS.textSecondary,
+                              }}
+                            >
+                              {formatDate(session.logout_time)}
+                            </Typography>
+                          </>
+                        ) : (
+                          <Chip
+                            label="Active"
+                            size="small"
+                            sx={{
+                              bgcolor: "rgba(16, 185, 129, 0.1)",
+                              color: "#10b981",
+                              fontWeight: 600,
+                              fontSize: "11px",
+                              height: 22,
+                            }}
+                          />
+                        )}
+                      </Box>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <AccessTimeIcon
+                          sx={{ color: COLORS.textSecondary, fontSize: 16 }}
+                        />
+                        <Typography
+                          sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                        >
+                          {formatDuration(session.duration_minutes)}
+                        </Typography>
+                      </Box>
+                      <Box
+                        sx={{
+                          fontSize: "13px",
+                          color: COLORS.textSecondary,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {session.logout_type || "-"}
+                      </Box>
+                    </Box>
+                  ))}
                 </Box>
+
                 {/* Pagination Footer */}
                 <Box
                   sx={{
@@ -632,9 +728,9 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                       Rows per page
                     </Typography>
                     <Select
-                      value={activityPageSize}
+                      value={sessionsPageSize}
                       onChange={(e) =>
-                        handleActivityPageSizeChange(e.target.value as number)
+                        handleSessionsPageSizeChange(e.target.value as number)
                       }
                       size="small"
                       sx={{
@@ -644,7 +740,7 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                       }}
                       MenuProps={menuProps}
                     >
-                      {PAGE_SIZE_OPTIONS.map((size) => (
+                      {SESSION_PAGE_SIZE_OPTIONS.map((size) => (
                         <MenuItem key={size} value={size} sx={menuItemStyles}>
                           {size}
                         </MenuItem>
@@ -652,47 +748,40 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                     </Select>
                   </Box>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    {activityPagination && (
-                      <Typography
-                        sx={{ fontSize: "13px", color: COLORS.textSecondary }}
-                      >
-                        {(activityPage - 1) * activityPageSize + 1}-
-                        {Math.min(
-                          activityPage * activityPageSize,
-                          activityPagination.total_items,
-                        )}{" "}
-                        of {activityPagination.total_items}
-                      </Typography>
+                    <Typography
+                      sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                    >
+                      {(sessionsPage - 1) * sessionsPageSize + 1}-
+                      {Math.min(sessionsPage * sessionsPageSize, totalSessions)}{" "}
+                      of {totalSessions}
+                    </Typography>
+                    {totalSessionPages > 1 && (
+                      <Pagination
+                        count={totalSessionPages}
+                        page={sessionsPage}
+                        onChange={(_, value) => setSessionsPage(value)}
+                        size="small"
+                        sx={{
+                          "& .MuiPaginationItem-root": {
+                            color: COLORS.textSecondary,
+                            borderColor: COLORS.border,
+                          },
+                          "& .Mui-selected": {
+                            bgcolor: `${COLORS.accent} !important`,
+                            color: "#fff !important",
+                          },
+                        }}
+                      />
                     )}
-                    {activityPagination &&
-                      activityPagination.total_pages > 1 && (
-                        <Pagination
-                          count={activityPagination.total_pages}
-                          page={activityPage}
-                          onChange={(_, value) => setActivityPage(value)}
-                          size="small"
-                          sx={{
-                            "& .MuiPaginationItem-root": {
-                              color: COLORS.textSecondary,
-                              borderColor: COLORS.border,
-                            },
-                            "& .Mui-selected": {
-                              bgcolor: `${COLORS.accent} !important`,
-                              color: "#fff !important",
-                            },
-                          }}
-                        />
-                      )}
                   </Box>
                 </Box>
               </>
             )}
           </>
-        )}
-
-        {activeTab === 1 && (
+        ) : (
+          // Session Interactions Detail View
           <>
-            {interactionLoading || interactionFetching ? (
+            {sessionInteractionsLoading || sessionInteractionsFetching ? (
               <Box
                 sx={{
                   display: "flex",
@@ -703,27 +792,21 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
               >
                 <CircularProgress sx={{ color: COLORS.accent }} size={32} />
               </Box>
-            ) : !selectedUserId ? (
+            ) : sessionInteractions.length === 0 ? (
               <Box sx={{ textAlign: "center", p: 6, bgcolor: COLORS.bgCard }}>
                 <Typography sx={{ color: COLORS.textSecondary }}>
-                  Please select a user to view interactions
-                </Typography>
-              </Box>
-            ) : interactionRecords.length === 0 ? (
-              <Box sx={{ textAlign: "center", p: 6, bgcolor: COLORS.bgCard }}>
-                <Typography sx={{ color: COLORS.textSecondary }}>
-                  No API interaction records found for this user
+                  No interactions found for this session
                 </Typography>
               </Box>
             ) : (
               <>
-                <Box sx={{ p: 2, bgcolor: COLORS.bgCard }}>
+                <Box sx={{ p: 2, bgcolor: COLORS.bgCard, overflow: "hidden" }}>
                   {/* Table Header */}
                   <Box
                     sx={{
                       display: "grid",
-                      // gridTemplateColumns: "180px 80px 1fr 80px 120px",
-                      gridTemplateColumns: "180px 80px 1fr 80px 120px 1fr",
+                      gridTemplateColumns:
+                        "160px 90px minmax(150px, 1fr) minmax(150px, 1fr)",
                       gap: 2,
                       px: 2,
                       py: 1.5,
@@ -739,7 +822,7 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                         textTransform: "uppercase",
                       }}
                     >
-                      Date and time
+                      Date and Time
                     </Typography>
                     <Typography
                       sx={{
@@ -749,7 +832,7 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                         textTransform: "uppercase",
                       }}
                     >
-                      Method
+                      Tab
                     </Typography>
                     <Typography
                       sx={{
@@ -769,42 +852,26 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                         textTransform: "uppercase",
                       }}
                     >
-                      Status
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: COLORS.textSecondary,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      IP Address
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: COLORS.textSecondary,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      Search Filters
+                      Query Params
                     </Typography>
                   </Box>
-                  {interactionRecords.map((record) => {
-                    const methodColors = getMethodColor(record.http_method);
+
+                  {/* Interaction Rows */}
+                  {sessionInteractions.map((interaction) => {
+                    const { tab, params } = parseQueryParams(
+                      interaction.query_params,
+                    );
                     return (
                       <Box
-                        key={record.id}
+                        key={interaction.id}
                         sx={{
                           display: "grid",
-                          // gridTemplateColumns: "180px 80px 1fr 80px 120px",
-                          gridTemplateColumns: "180px 80px 1fr 80px 120px 1fr",
+                          gridTemplateColumns:
+                            "160px 90px minmax(150px, 1fr) minmax(150px, 1fr)",
                           gap: 2,
                           px: 2,
                           py: 1.5,
-                          alignItems: "center",
+                          alignItems: "flex-start",
                           borderRadius: "8px",
                           "&:hover": {
                             bgcolor: COLORS.bgHover,
@@ -814,21 +881,27 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                         <Typography
                           sx={{ fontSize: "13px", color: COLORS.textSecondary }}
                         >
-                          {formatDate(record.created_at)}
+                          {formatDate(interaction.created_at)}
                         </Typography>
                         <Chip
-                          label={record.http_method}
+                          label={tab}
                           size="small"
                           sx={{
-                            bgcolor: methodColors.bg,
-                            color: methodColors.color,
                             fontWeight: 600,
                             fontSize: "11px",
-                            height: 24,
-                            width: "fit-content",
+                            height: 22,
+                            textTransform: "capitalize",
+                            bgcolor:
+                              tab === "-"
+                                ? "rgba(107, 114, 128, 0.1)"
+                                : "rgba(79, 70, 229, 0.1)",
+                            color:
+                              tab === "-"
+                                ? COLORS.textSecondary
+                                : COLORS.accent,
                           }}
                         />
-                        <Tooltip title={record.endpoint} arrow>
+                        <Tooltip title={interaction.endpoint} arrow>
                           <Typography
                             sx={{
                               fontSize: "13px",
@@ -839,90 +912,30 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                               whiteSpace: "nowrap",
                             }}
                           >
-                            {record.endpoint}
+                            {interaction.endpoint}
                           </Typography>
                         </Tooltip>
-
-                        <Chip
-                          label={record.response_status}
-                          size="small"
-                          sx={{
-                            bgcolor: "transparent",
-                            color: getStatusColor(record.response_status),
-                            fontWeight: 600,
-                            fontSize: "12px",
-                            height: 24,
-                            width: "fit-content",
-                            border: `1px solid ${getStatusColor(record.response_status)}20`,
-                          }}
-                        />
-                        <Typography
-                          sx={{ fontSize: "13px", color: COLORS.textSecondary }}
-                        >
-                          {record.ip_address}
-                        </Typography>
-                        {/* <Tooltip title={record.query_params} arrow>
-                          <Typography
-                            sx={{
-                              fontSize: "13px",
-                              color: COLORS.textPrimary,
-                              fontFamily: "monospace",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "pre-wrap", // allow line breaks
-                              wordBreak: "break-word", // wrap long params
-                            }}
-                          >
-                            {record.query_params}
-                          </Typography>
-                        </Tooltip> */}
-                        <Tooltip title={record.query_params} arrow>
-                          <Typography
-                            sx={{
-                              fontSize: "13px",
-                              color: COLORS.textPrimary,
-                              fontFamily: "monospace",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "pre-wrap", // allow line breaks
-                              wordBreak: "break-word", // wrap long params
-                            }}
-                          >
-                            {/* {decodeURIComponent(
-                              record.query_params.replace(/\+/g, " "),
-                            )
-                              .split("&")
-                              .filter(
-                                (param) =>
-                                  !param.startsWith("page=") &&
-                                  !param.startsWith("page_size="),
-                              )
-                              .join("\n")} */}
-                            {decodeURIComponent(
-                              record.query_params.replace(/\+/g, " "),
-                            )
-                              .split("&")
-                              .filter((param) => {
-                                // Hide page & page_size if page=1
-                                if (
-                                  param.startsWith("page=") &&
-                                  param === "page=1"
-                                )
-                                  return false;
-                                if (
-                                  param.startsWith("page_size=") &&
-                                  record.query_params.includes("page=1")
-                                )
-                                  return false;
-                                return true; // keep all other params
-                              })
-                              .join("\n")}
-                          </Typography>
-                        </Tooltip>
+                        <Box sx={{ overflow: "hidden" }}>
+                          <Tooltip title={params} arrow>
+                            <Typography
+                              sx={{
+                                fontSize: "12px",
+                                color: COLORS.textPrimary,
+                                fontFamily: "monospace",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              {params}
+                            </Typography>
+                          </Tooltip>
+                        </Box>
                       </Box>
                     );
                   })}
                 </Box>
+
                 {/* Pagination Footer */}
                 <Box
                   sx={{
@@ -942,9 +955,9 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                       Rows per page
                     </Typography>
                     <Select
-                      value={interactionPageSize}
+                      value={sessionInteractionPageSize}
                       onChange={(e) =>
-                        handleInteractionPageSizeChange(
+                        handleSessionInteractionPageSizeChange(
                           e.target.value as number,
                         )
                       }
@@ -956,7 +969,7 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                       }}
                       MenuProps={menuProps}
                     >
-                      {PAGE_SIZE_OPTIONS.map((size) => (
+                      {SESSION_PAGE_SIZE_OPTIONS.map((size) => (
                         <MenuItem key={size} value={size} sx={menuItemStyles}>
                           {size}
                         </MenuItem>
@@ -964,37 +977,39 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
                     </Select>
                   </Box>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    {interactionPagination && (
-                      <Typography
-                        sx={{ fontSize: "13px", color: COLORS.textSecondary }}
-                      >
-                        {(interactionPage - 1) * interactionPageSize + 1}-
-                        {Math.min(
-                          interactionPage * interactionPageSize,
-                          interactionPagination.total_items,
-                        )}{" "}
-                        of {interactionPagination.total_items}
-                      </Typography>
+                    <Typography
+                      sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                    >
+                      {(sessionInteractionPage - 1) *
+                        sessionInteractionPageSize +
+                        1}
+                      -
+                      {Math.min(
+                        sessionInteractionPage * sessionInteractionPageSize,
+                        totalSessionInteractions,
+                      )}{" "}
+                      of {totalSessionInteractions}
+                    </Typography>
+                    {totalSessionInteractionPages > 1 && (
+                      <Pagination
+                        count={totalSessionInteractionPages}
+                        page={sessionInteractionPage}
+                        onChange={(_, value) =>
+                          setSessionInteractionPage(value)
+                        }
+                        size="small"
+                        sx={{
+                          "& .MuiPaginationItem-root": {
+                            color: COLORS.textSecondary,
+                            borderColor: COLORS.border,
+                          },
+                          "& .Mui-selected": {
+                            bgcolor: `${COLORS.accent} !important`,
+                            color: "#fff !important",
+                          },
+                        }}
+                      />
                     )}
-                    {interactionPagination &&
-                      interactionPagination.total_pages > 1 && (
-                        <Pagination
-                          count={interactionPagination.total_pages}
-                          page={interactionPage}
-                          onChange={(_, value) => setInteractionPage(value)}
-                          size="small"
-                          sx={{
-                            "& .MuiPaginationItem-root": {
-                              color: COLORS.textSecondary,
-                              borderColor: COLORS.border,
-                            },
-                            "& .Mui-selected": {
-                              bgcolor: `${COLORS.accent} !important`,
-                              color: "#fff !important",
-                            },
-                          }}
-                        />
-                      )}
                   </Box>
                 </Box>
               </>

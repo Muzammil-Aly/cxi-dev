@@ -16,9 +16,10 @@ interface Props {
   setSelectedOrderItem?: React.Dispatch<React.SetStateAction<any | null>>;
   orderItemSec?: boolean;
   filters?: string;
+  source?: string;
 }
 
-const NavETA = ({ sku }: Props) => {
+const NavETA = ({ sku, source }: Props) => {
   // Use column preferences hook
   const {
     filteredColumns,
@@ -51,6 +52,7 @@ const NavETA = ({ sku }: Props) => {
       page,
       page_size: pageSize,
       sku: sku || "",
+      source,
     },
     { skip: !sku }, // Only fetch if sku is provided
   );

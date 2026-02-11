@@ -1,26 +1,9 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
-import { getAccessToken } from "@/utils/auth";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { baseQueryWithReauth } from "../baseQueryWithReauth";
 
 export const eventsApi = createApi({
   reducerPath: "eventsApi",
-  baseQuery: fetchBaseQuery({
-    baseUrl: process.env.NEXT_PUBLIC_BASE_URL,
-    prepareHeaders: (headers) => {
-      // Try to get JWT token first
-      const jwtToken = getAccessToken();
-      if (jwtToken) {
-        headers.set("Authorization", `Bearer ${jwtToken}`);
-      } else {
-        // Fallback to Databricks PAT for backwards compatibility
-        const token = process.env.NEXT_PUBLIC_DATABRICKS_PAT;
-        if (token) {
-          headers.set("Authorization", `Bearer ${token}`);
-        }
-      }
-      headers.set("Content-Type", "application/json");
-      return headers;
-    },
-  }),
+  baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
     getProfileEvents: builder.query<
       any,
@@ -48,6 +31,7 @@ export const eventsApi = createApi({
         email?: string;
         customer_name?: string;
         event_timestamp?: string;
+        source?: string;
       }
     >({
       query: ({
@@ -60,10 +44,12 @@ export const eventsApi = createApi({
         email,
         customer_name,
         event_timestamp,
+        source,
       }) => {
         const params = new URLSearchParams();
         params.set("page", page.toString());
         params.set("page_size", page_size.toString());
+        if (source) params.set("source", source);
         if (event_type) params.set("event_type", event_type);
         if (event_id) params.set("event_id", event_id);
         if (campaign_name) params.set("campaign_name", campaign_name);

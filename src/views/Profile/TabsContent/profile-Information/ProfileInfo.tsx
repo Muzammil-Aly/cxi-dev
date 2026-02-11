@@ -57,13 +57,13 @@ const DetailedInfo = () => {
   const [pageSize, setPageSize] = useState(10);
 
   const [sourceFilter, setSourceFilter] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [customerIdFilter, setCustomerIdFilter] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [fullNameFilter, setFullNameFilter] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [phoneNumberFilter, setPhoneNumberFilter] = useState<
     string | undefined
@@ -78,13 +78,13 @@ const DetailedInfo = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [dateFilter, setDateFilter] = useState<string | undefined>(undefined);
   const [lastDateFilter, setLastDateFilter] = useState<string | undefined>(
-    undefined
+    undefined,
   );
   const [lastDateInput, setLastDateInput] = useState<any>(null);
 
   const [dateInput, setDateInput] = useState<any>(null);
   const [highlightedId, setHighlightedId] = useState<string | number | null>(
-    null
+    null,
   );
   const { data, isLoading, refetch, isFetching } = useGetProfilesQuery(
     {
@@ -92,13 +92,14 @@ const DetailedInfo = () => {
       page_size: pageSize,
       email: searchTerm || undefined,
       source: sourceFilter || undefined,
+      tab: "Profiles",
       customer_id: customerIdFilter || undefined,
       full_name: fullNameFilter || undefined,
       phone: phoneNumberFilter || undefined,
       created_at: dateFilter || undefined,
       last_order_date: lastDateFilter || undefined,
     },
-    { skip: false }
+    { skip: false },
   );
   const { data: fullNameSuggestions = [], isFetching: isFullNameLoading } =
     useGetFullNamesQuery(fullNameInput, {
@@ -188,7 +189,7 @@ const DetailedInfo = () => {
         setPage(1);
         setIsCustomerIDTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const debouncedFullName = useMemo(
@@ -198,7 +199,7 @@ const DetailedInfo = () => {
         setPage(1);
         setIsFullNameTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const debouncedPhoneNumber = useMemo(
@@ -208,7 +209,7 @@ const DetailedInfo = () => {
         setPage(1);
         setIsPhoneNumberTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const debouncedSearch = useMemo(
@@ -218,7 +219,7 @@ const DetailedInfo = () => {
         setPage(1);
         setIsTyping(false);
       }, 5000),
-    []
+    [],
   );
 
   const toggleSouceoptions = (option: string) => {

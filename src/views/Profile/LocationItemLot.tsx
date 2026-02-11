@@ -18,6 +18,7 @@ interface Props {
   setSelectedOrderItem?: React.Dispatch<React.SetStateAction<any | null>>;
   orderItemSec?: boolean;
   filters?: string;
+  source?: string;
 }
 
 interface ZPartETAItem {
@@ -40,7 +41,7 @@ interface ZPartETAItem {
   qty: number;
 }
 
-const LocationItemLot = ({ sku }: Props) => {
+const LocationItemLot = ({ sku, source }: Props) => {
   // Use column preferences hook
   // LocationItemLot is always nested (requires sku prop), so always disable tab management
   const {
@@ -77,6 +78,7 @@ const LocationItemLot = ({ sku }: Props) => {
       page,
       page_size: pageSize,
       sku: sku || "",
+      source,
     },
     { skip: !sku }, // Only fetch if sku is provided
   );
