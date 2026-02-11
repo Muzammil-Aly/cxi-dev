@@ -242,8 +242,8 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
 
   // Parse date filter for API queries
   const parsedDates = dateFilter?.split(",") || [];
-  const loginFrom = parsedDates[0] || undefined;
-  const loginTo = parsedDates[1] || undefined;
+  const dateFrom = parsedDates[0] || undefined;
+  const dateTo = parsedDates[1] || undefined;
 
   // Sessions query
   const {
@@ -255,8 +255,8 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
       user_id: selectedUserId || "",
       page: sessionsPage,
       page_size: sessionsPageSize,
-      login_from: loginFrom,
-      login_to: loginTo,
+      date_from: dateFrom,
+      date_to: dateTo,
     },
     { skip: !open || !selectedUserId },
   );

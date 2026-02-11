@@ -172,8 +172,8 @@ interface SessionsRequest {
   user_id: string;
   page?: number;
   page_size?: number;
-  login_from?: string;
-  login_to?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 interface SessionInteraction {
@@ -301,11 +301,11 @@ export const authApi = createApi({
       },
     }),
     getSessions: builder.query<SessionsResponse, SessionsRequest>({
-      query: ({ user_id, page = 1, page_size = 20, login_from, login_to }) => {
+      query: ({ user_id, page = 1, page_size = 20, date_from, date_to }) => {
         const params = new URLSearchParams();
         params.append("user_id", user_id);
-        if (login_from) params.append("login_from", login_from);
-        if (login_to) params.append("login_to", login_to);
+        if (date_from) params.append("date_from", date_from);
+        if (date_to) params.append("date_to", date_to);
         params.append("page", page.toString());
         params.append("page_size", page_size.toString());
         return `/sessions?${params.toString()}`;
