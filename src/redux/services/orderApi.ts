@@ -82,14 +82,14 @@ export const orderApi = createApi({
         `customer_order_items?order_id=${orderId}&source=${source || "orders"}`,
     }),
 
-    getReturns: builder.query<any, { customer_id: string }>({
-      query: ({ customer_id }) =>
-        `customer_orders_return?customer_id=${customer_id}`,
+    getReturns: builder.query<any, { customer_id: string; source?: string }>({
+      query: ({ customer_id, source }) =>
+        `customer_orders_return?customer_id=${customer_id}${source ? `&source=${source}` : ""}`,
     }),
 
-    getRefunds: builder.query<any, { customer_id: string }>({
-      query: ({ customer_id }) =>
-        `customer_orders_refund?customer_id=${customer_id}`,
+    getRefunds: builder.query<any, { customer_id: string; source?: string }>({
+      query: ({ customer_id, source }) =>
+        `customer_orders_refund?customer_id=${customer_id}${source ? `&source=${source}` : ""}`,
     }),
   }),
 });

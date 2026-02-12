@@ -109,7 +109,7 @@ const Return = ({ customer_id }: Props) => {
 
   // Fetch filtered ZPart ETA data (based on SKU)
   const { data, isLoading, isFetching } = useGetReturnsQuery(
-    { customer_id: customer_id || "" },
+    { customer_id: customer_id || "", source: "Returns" },
     { skip: !customer_id } // Only fetch if sku is provided
   );
 

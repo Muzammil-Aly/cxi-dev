@@ -93,7 +93,7 @@ const OrderItems = ({
 
   // Fetch order items from API using the orderId
   const { data, isLoading, isFetching, refetch } = useGetOrderItemsQuery(
-    { orderId, source: "orders" },
+    { orderId, source: "Orders" },
     { skip: !orderId },
   );
   const dispatch = useDispatch();

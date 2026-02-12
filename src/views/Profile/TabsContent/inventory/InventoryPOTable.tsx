@@ -91,6 +91,7 @@ const InventoryPOTable: React.FC<InventoryPOTableProps> = ({
         page_size: pageSizeInput,
         location_code,
         item_no,
+        source: "Inventory",
       });
     }
   }, [location_code, item_no, pageSizeInput, getPOInventory]);

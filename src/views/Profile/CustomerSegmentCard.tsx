@@ -274,7 +274,7 @@ const CustomerSegmentCard: React.FC<Props> = ({ custId }) => {
   console.log("isCustomerSegmentsOpen", isCustomerSegmentsOpen);
   // ✅ Fetch data
   const { data, error, isLoading, isFetching } = useGetCustomerSegmentQuery(
-    { custId: String(custId) },
+    { custId: String(custId), source: "Customer Profiles" },
     { skip: !custId }
   );
 

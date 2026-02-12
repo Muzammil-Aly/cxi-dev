@@ -96,6 +96,7 @@ const InventorySOTable: React.FC<InventorySOTableProps> = ({
         page_size: pageSizeInput,
         location_code,
         item_no,
+        source: "Inventory",
       });
     }
   }, [location_code, item_no, page, pageSizeInput, getSOInventory]);

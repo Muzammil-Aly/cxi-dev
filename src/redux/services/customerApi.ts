@@ -55,8 +55,8 @@ export const customerApi = createApi({
       },
     }),
 
-    getCustomerSegment: builder.query<any, { custId: string }>({
-      query: ({ custId }) => `customer_segments?cust_id=${custId}`,
+    getCustomerSegment: builder.query<any, { custId: string; source?: string }>({
+      query: ({ custId, source }) => `customer_segments?cust_id=${custId}${source ? `&source=${source}` : ""}`,
     }),
 
     getSegments: builder.query<any, { page?: number; page_size?: number }>({

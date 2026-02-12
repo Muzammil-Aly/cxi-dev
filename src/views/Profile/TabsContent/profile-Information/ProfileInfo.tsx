@@ -92,7 +92,7 @@ const DetailedInfo = () => {
       page_size: pageSize,
       email: searchTerm || undefined,
       source: sourceFilter || undefined,
-      tab: "Profiles",
+      tab: "Customer Profiles",
       customer_id: customerIdFilter || undefined,
       full_name: fullNameFilter || undefined,
       phone: phoneNumberFilter || undefined,

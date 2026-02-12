@@ -102,7 +102,7 @@ const InventoryQTYone: React.FC<InventoryQTYone> = ({
   // Trigger manually when props change or drawer opens
   useEffect(() => {
     if (location_code && item_no) {
-      getQTYone({ location_code, item_no, page, page_size: pageSize });
+      getQTYone({ location_code, item_no, page, page_size: pageSize, source: "Inventory" });
     }
   }, [location_code, item_no, page, pageSize, getQTYone]);
 

@@ -194,7 +194,7 @@ const SupportTickets = ({ customerId }: { customerId?: string }) => {
     {
       page,
       page_size: pageSize,
-      source: "support",
+      source: "Support Tickets",
       customer_id: customerIdFilter || customerId || undefined,
       ticket_id: ticketIdFilter || undefined,
       customer_name: customerNameFilter || undefined,

@@ -127,7 +127,7 @@ const InventoryQTYtwo: React.FC<InventoryQTYtwo> = ({
   const queryParams = {
     page,
     page_size: pageSize,
-    source: "inventory",
+    source: "Inventory",
     location_code: selectedQtyoneLocationCode,
     item_no: selectedQtyoneItem,
     bin_code: filters.bin_code,

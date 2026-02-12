@@ -101,7 +101,7 @@ const Refund = ({ customer_id }: Props) => {
 
   // Fetch returns data filtered by customer_id
   const { data, isLoading, isFetching } = useGetRefundsQuery(
-    { customer_id: customer_id || "" },
+    { customer_id: customer_id || "", source: "Refunds" },
     { skip: !customer_id }
   );
 

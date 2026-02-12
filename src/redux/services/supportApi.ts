@@ -57,15 +57,17 @@ export const supportApi = createApi({
         ticketId?: number;
         page?: number;
         page_size?: number;
+        source?: string;
       }
     >({
-      query: ({ customerId, ticketId, page = 1, page_size = 50 }) => {
+      query: ({ customerId, ticketId, page = 1, page_size = 50, source }) => {
         const queryParams: string[] = [];
         if (customerId) queryParams.push(`customer_id=${customerId}`);
         if (ticketId) queryParams.push(`ticket_id=${ticketId}`);
 
         queryParams.push(`page=${page}`);
         queryParams.push(`page_size=${page_size}`);
+        if (source) queryParams.push(`source=${source}`);
 
         return `support_ticket_comments?${queryParams.join("&")}`;
       },

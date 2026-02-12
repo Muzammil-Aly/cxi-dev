@@ -217,7 +217,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
   const { data, isLoading, isFetching } = useGetCustomerOrdersQuery({
     page,
     page_size: pageSize,
-    source: "orders",
+    source: "Orders",
     order_id: orderIdFilter || undefined,
     customer_id: customerIdFilter || customerId || undefined,
     customer_name: customerNameFilter || undefined,

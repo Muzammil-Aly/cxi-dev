@@ -44,7 +44,7 @@ const SupportTicketComments: React.FC<SupportTicketCommentsProps> = ({
       // { customerId: numericCustId },
       // { skip: !customerId }
 
-      { ticketId: numericTicketId, page_size: 50 },
+      { ticketId: numericTicketId, page_size: 50, source: "Support Tickets" },
       { skip: !ticketId }
     );
 

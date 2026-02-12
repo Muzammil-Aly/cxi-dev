@@ -87,7 +87,7 @@ const MarketingEvents: React.FC<MarketingEventsProps> = ({ customerId }) => {
   const { data, isLoading, isFetching } = useGetCustomerEventsQuery({
     page,
     page_size: pageSize,
-    source: "events",
+    source: "Marketing Events",
     event_id: eventIdFilter,
     customer_id: customerIdFilter || customerId,
     campaign_name: campaignFilter,

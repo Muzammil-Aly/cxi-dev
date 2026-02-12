@@ -350,13 +350,13 @@ const ResponsiveDashboard = ({
               <LocationItemLot
                 sku={selectedOrderItem?.sku}
                 filters={filters}
-                source="orders"
+                source="Orders"
               />
               <Box sx={{ p: 2, borderRadius: 3, height: "100%" }}>
                 <NavETA
                   sku={selectedOrderItem?.sku}
                   filters={filters}
-                  source="orders"
+                  source="Orders"
                 />
               </Box>
             </>
@@ -380,13 +380,13 @@ const ResponsiveDashboard = ({
                 sku={selectedOrderItem.sku}
                 setSelectedTouchup={handleSelectTouchup}
                 shouldFilterNull
-                source="orders"
+                source="Orders"
               />
               <ItemTrackingComments
                 sku={selectedOrderItem.sku}
                 lotNo={selectedOrderItem.lot_no}
                 shouldFilterNull
-                source="orders"
+                source="Orders"
               />
               {isTouchupPensOpen && selectedTouchup && (
                 <Box sx={{ p: 2, borderRadius: 3, height: "100%" }}>
@@ -394,7 +394,7 @@ const ResponsiveDashboard = ({
                     orderId={selectedOrderItem.order_id}
                     Colorslug={selectedTouchup?.color_slug}
                     shouldFilterNull
-                    source="orders"
+                    source="Orders"
                   />
                 </Box>
               )}
