@@ -5154,6 +5154,7 @@ import {
   useGetCxiUsersQuery,
   useGetSessionsQuery,
   useGetSessionInteractionsQuery,
+  useGetSessionStatsQuery,
 } from "@/redux/services/authApi";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
@@ -5246,16 +5247,79 @@ const parseQueryParams = (queryParams: string | null) => {
 // ──────────────────────────────────────────────────────────────
 // Grouping + sorting in ascending order (oldest → newest)
 // ──────────────────────────────────────────────────────────────
+// const prepareTimelineGroups = (interactions: any[]) => {
+//   if (!interactions.length) return [];
+
+//   // 1. Sort by created_at ascending (oldest first)
+//   const sorted = [...interactions].sort(
+//     (a, b) =>
+//       new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+//   );
+
+//   // 2. Group consecutive similar actions
+//   const groups: any[][] = [];
+//   let currentGroup: any[] = [sorted[0]];
+
+//   for (let i = 1; i < sorted.length; i++) {
+//     const prev = sorted[i - 1];
+//     const curr = sorted[i];
+
+//     const { tab: prevTab, params: prevParams } = parseQueryParams(
+//       prev.query_params,
+//     );
+//     const { tab: currTab, params: currParams } = parseQueryParams(
+//       curr.query_params,
+//     );
+
+//     const sameEndpoint = curr.endpoint === prev.endpoint;
+//     const sameTab = prevTab === currTab && prevTab !== "-";
+//     const sameMainParams =
+//       prevParams === currParams || (prevParams === "-" && currParams === "-");
+
+//     const timeDiff =
+//       new Date(curr.created_at).getTime() - new Date(prev.created_at).getTime();
+
+//     if (
+//       sameMainParams &&
+//       (sameEndpoint || sameTab) &&
+//       timeDiff < 300000 // 5 minutes
+//     ) {
+//       currentGroup.push(curr);
+//     } else {
+//       groups.push(currentGroup);
+//       currentGroup = [curr];
+//     }
+//   }
+
+//   groups.push(currentGroup);
+//   return groups;
+// };
+// ──────────────────────────────────────────────────────────────
+// Keep everything else intact, only sort (oldest → newest) and wrap each event in its own group
+// ──────────────────────────────────────────────────────────────
+// const prepareTimelineGroups = (interactions: any[]) => {
+//   if (!interactions.length) return [];
+
+//   // 1. Sort by created_at ascending (oldest first)
+//   const sorted = [...interactions].sort(
+//     (a, b) =>
+//       new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+//   );
+
+//   // 2. Wrap each interaction in its own group so no grouping occurs
+//   return sorted.map((interaction) => [interaction]);
+// };
+// ──────────────────────────────────────────────────────────────
+// Group by tab/endpoint, then keep all actions individually inside
+// ──────────────────────────────────────────────────────────────
 const prepareTimelineGroups = (interactions: any[]) => {
   if (!interactions.length) return [];
 
-  // 1. Sort by created_at ascending (oldest first)
   const sorted = [...interactions].sort(
     (a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   );
 
-  // 2. Group consecutive similar actions
   const groups: any[][] = [];
   let currentGroup: any[] = [sorted[0]];
 
@@ -5276,11 +5340,11 @@ const prepareTimelineGroups = (interactions: any[]) => {
       prevParams === currParams || (prevParams === "-" && currParams === "-");
 
     const timeDiff =
-      new Date(curr.created_at).getTime() - new Date(prev.created_at).getTime();
+      new Date(curr.created_at).getTime() -
+      new Date(prev.created_at).getTime();
 
     if (
-      sameMainParams &&
-      (sameEndpoint || sameTab) &&
+      (sameEndpoint || (sameTab && sameMainParams)) &&
       timeDiff < 300000 // 5 minutes
     ) {
       currentGroup.push(curr);
@@ -5408,6 +5472,20 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
     },
     { skip: !selectedSessionId || !selectedUserId },
   );
+
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+  } = useGetSessionStatsQuery(
+    {
+      user_id: selectedUserId || undefined,
+      date_from: dateFrom,
+      date_to: dateTo,
+    },
+    { skip: !open || !selectedUserId },
+  );
+
+  const stats = statsData?.data;
 
   const users = usersData?.data || [];
   const sessions = sessionsData?.data?.sessions || [];
@@ -5639,6 +5717,93 @@ const UserActivityLog: React.FC<UserActivityLogProps> = ({ open, onClose }) => {
             />
           </Box>
         </Box>
+
+        {/* Stats Cards */}
+        {!selectedSessionId && selectedUserId && (
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: 2,
+              p: 2.5,
+              borderBottom: `1px solid ${COLORS.border}`,
+              bgcolor: COLORS.bg,
+            }}
+          >
+            {[
+              {
+                label: "Total Sessions",
+                value: stats?.total_sessions ?? "-",
+                color: "#4F46E5",
+              },
+              {
+                label: "Unique Sessions",
+                value: stats?.unique_sessions ?? "-",
+                color: "#0EA5E9",
+              },
+              {
+                label: "Unique Users",
+                value: stats?.unique_users ?? "-",
+                color: "#8B5CF6",
+              },
+              {
+                label: "Avg Session Time",
+                value:
+                  stats?.avg_session_time_minutes != null
+                    ? `${stats.avg_session_time_minutes} min`
+                    : "-",
+                color: "#F59E0B",
+              },
+              {
+                label: "Total Duration",
+                value:
+                  stats?.total_session_duration_minutes != null
+                    ? stats.total_session_duration_minutes >= 60
+                      ? `${Math.floor(stats.total_session_duration_minutes / 60)}h ${Math.round(stats.total_session_duration_minutes % 60)}m`
+                      : `${stats.total_session_duration_minutes} min`
+                    : "-",
+                color: "#10B981",
+              },
+            ].map((card) => (
+              <Box
+                key={card.label}
+                sx={{
+                  bgcolor: COLORS.bgCard,
+                  borderRadius: "10px",
+                  p: 2,
+                  border: `1px solid ${COLORS.border}`,
+                  textAlign: "center",
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: COLORS.textSecondary,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                    mb: 0.5,
+                  }}
+                >
+                  {card.label}
+                </Typography>
+                {statsLoading ? (
+                  <CircularProgress size={20} sx={{ color: card.color }} />
+                ) : (
+                  <Typography
+                    sx={{
+                      fontSize: "22px",
+                      fontWeight: 700,
+                      color: card.color,
+                    }}
+                  >
+                    {card.value}
+                  </Typography>
+                )}
+              </Box>
+            ))}
+          </Box>
+        )}
 
         {!selectedSessionId ? (
           <>

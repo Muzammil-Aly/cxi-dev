@@ -46,8 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({
 
   // Check if current user is admin (mdb1)
   // const isAdmin = userId === "kav1";
-  const isAdmin = userId === "kav1" || userId === "mdb1";
-
+  const isAdmin = userId === "v1" || userId === "b1";
 
   useEffect(() => {
     const loadUser = () => {
@@ -123,7 +122,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const open = Boolean(anchorEl);
-  const handleLogout = async () => {
+  const handleLogout = () => {
     const refreshToken = localStorage.getItem("refresh_token");
 
     // Clear session markers and auth data before redirecting
@@ -133,22 +132,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     clearAuthData();
     handleClose();
 
-    try {
-      if (refreshToken) {
-        const response = await logout({
-          refresh_token: refreshToken,
-        }).unwrap();
-
-        if (response?.status === 200) {
-          console.log(" Logout success:", response.message);
-        }
-      }
-    } catch (err) {
-      console.error(" Logout error:", err);
+    // Fire-and-forget: tell backend to revoke, don't wait for response
+    if (refreshToken) {
+      logout({ refresh_token: refreshToken }).catch(() => {});
     }
 
-    // Redirect after clearing auth data
-    window.location.href = "/sign-in";
+    // Redirect immediately – auth data is already cleared
+    router.push("/sign-in");
   };
 
   return (

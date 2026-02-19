@@ -1,11 +1,12 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Box } from "@mui/material";
 import InfoIcon from "@mui/icons-material/Info";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
 import SupportAgentIcon from "@mui/icons-material/SupportAgent";
 import EventIcon from "@mui/icons-material/Event";
 import InventoryIcon from "@mui/icons-material/Inventory";
+import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import Sidebar from "./Sidebar";
 import { useRouter } from "next/navigation";
 import {
@@ -34,6 +35,10 @@ const ProfileLayout: React.FC<ProfileLayoutProps> = ({
     clearAuthData();
     router.push("/sign-in");
   };
+  // const userId = localStorage.getItem("user_id") || "";
+  // const isAdmin = userId === "kav1" || userId === "mdb1";
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const menuItems = [
     {
@@ -66,14 +71,47 @@ const ProfileLayout: React.FC<ProfileLayoutProps> = ({
       icon: <InventoryIcon />,
       path: "/inventory",
     },
+    {
+      key: "Admin Oversight",
+      label: "Admin Oversight",
+      icon: <AdminPanelSettingsIcon />,
+      path: "/admin-oversight",
+    },
   ];
+  const [filteredMenuItems, setFilteredMenuItems] = useState(menuItems);
+  useEffect(() => {
+    const loadUser = () => {
+      const storedUserId = localStorage.getItem("userId");
+
+      setUserId(storedUserId);
+    };
+
+    loadUser();
+    const timer = setTimeout(loadUser, 300);
+    return () => clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!userId) return; // wait until userId is loaded
+
+    const admin = userId === "kav1" || userId === "mdb1";
+    setIsAdmin(admin);
+
+    setFilteredMenuItems(
+      menuItems.filter((item) => {
+        if (item.key === "Admin Oversight") {
+          return admin;
+        }
+        return true;
+      }),
+    );
+  }, [userId]);
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#f8f9fa" }}>
       {/* Sidebar (fixed) */}
       <Box sx={{ width: 130, flexShrink: 0 }}>
         <Sidebar
-          menuItems={menuItems}
+          menuItems={filteredMenuItems}
           activeMenu={activeMenu}
           onLogout={handleLogout}
         />

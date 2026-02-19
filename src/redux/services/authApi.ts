@@ -212,6 +212,28 @@ interface SessionInteractionsRequest {
   page_size?: number;
 }
 
+interface SessionStatsData {
+  total_sessions: number;
+  unique_sessions: number;
+  unique_users: number;
+  total_session_duration_minutes: number;
+  avg_session_time_minutes: number;
+}
+
+interface SessionStatsResponse {
+  status: number;
+  system_status: number;
+  data: SessionStatsData;
+  message: string;
+  system_error_message: string;
+}
+
+interface SessionStatsRequest {
+  user_id?: string;
+  date_from?: string;
+  date_to?: string;
+}
+
 export const authApi = createApi({
   reducerPath: "authApi",
   baseQuery: fetchBaseQuery({
@@ -324,6 +346,21 @@ export const authApi = createApi({
         return `/sessions/interactions?${params.toString()}`;
       },
     }),
+    getSessionStats: builder.query<SessionStatsResponse, SessionStatsRequest>({
+      query: ({ user_id, date_from, date_to }) => {
+        const params = new URLSearchParams();
+        if (user_id) params.append("user_id", user_id);
+        if (date_from) params.append("date_from", date_from);
+        if (date_to) params.append("date_to", date_to);
+        return `/sessions/stats?${params.toString()}`;
+      },
+    }),
+    getActiveSessions: builder.query<
+      { status: number; data: Record<string, number>; message: string },
+      void
+    >({
+      query: () => `/sessions/active`,
+    }),
   }),
 });
 
@@ -336,4 +373,6 @@ export const {
   useGetUserInteractionQuery,
   useGetSessionsQuery,
   useGetSessionInteractionsQuery,
+  useGetSessionStatsQuery,
+  useGetActiveSessionsQuery,
 } = authApi;

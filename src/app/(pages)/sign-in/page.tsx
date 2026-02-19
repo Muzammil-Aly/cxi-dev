@@ -56,10 +56,8 @@ export default function SignIn() {
         setSeverity("success");
         setMessage("Signed in successfully!");
 
-        // Use window.location.href for full page reload to ensure cookie is sent to server
-        setTimeout(() => {
-          window.location.href = "/profile";
-        }, 500);
+        // Navigate immediately – cookies are already set, no reload needed
+        router.push("/profile");
       } else {
         setSeverity("error");
         setMessage(response.message || "Login failed");
