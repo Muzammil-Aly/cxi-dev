@@ -72,6 +72,8 @@ const useOrderItems = (columns: Column[]) => {
             minWidth: 210,
             cellStyle: { whiteSpace: "normal" },
           };
+        case "url":
+          return { ...col, headerName: "URL", flex: 1, minWidth: 140 };
         // case "order_id":
         //   return {
         //     ...col,

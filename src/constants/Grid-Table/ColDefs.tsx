@@ -240,7 +240,13 @@ export const orderItems = (
     headerName: "Sales Order Aging Days",
     cellRenderer: CopyCellRenderer,
   },
-
+  {
+    field: "url",
+    headerName: "URL",
+    cellRenderer: CopyCellRenderer,
+    suppressClickEdit: true,
+    suppressNavigable: true,
+  },
   // {
   //   field: "item_type",
   //   headerName: "Item Type",

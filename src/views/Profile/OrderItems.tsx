@@ -125,6 +125,7 @@ const OrderItems = ({
           alternative_status: item.alternative_status,
           sales_order_aging_days: item.sales_order_aging_days,
           shipping_agent_code: item.shipping_agent_code || "N/A",
+          url: item.url || "N/A",
         }))
       : [];
   }, [data]);
