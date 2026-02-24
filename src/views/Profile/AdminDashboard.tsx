@@ -26,6 +26,9 @@ import LoginIcon from "@mui/icons-material/Login";
 import LogoutIcon from "@mui/icons-material/Logout";
 import PeopleIcon from "@mui/icons-material/People";
 import PersonIcon from "@mui/icons-material/Person";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import dayjs, { Dayjs } from "dayjs";
 import {
   useGetCxiUsersQuery,
@@ -260,6 +263,19 @@ const AdminDashboard = () => {
   const [interactionPage, setInteractionPage] = useState(1);
   const [interactionPageSize, setInteractionPageSize] = useState(50);
 
+  // Column sort
+  const [sortCol, setSortCol] = useState<string>("active_sessions");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+
+  const handleColSort = (col: string) => {
+    if (sortCol === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortCol(col);
+      setSortDir("desc");
+    }
+  };
+
   const parsedDates = dateFilter?.split(",") || [];
   const dateFrom = parsedDates[0] || undefined;
   const dateTo = parsedDates[1] || undefined;
@@ -320,18 +336,37 @@ const AdminDashboard = () => {
   );
 
   const rawUsers = usersData?.data || [];
-  const activeMap: Record<string, number> = activeSessionsData?.data || {};
+  const activeMap: Record<string, { active_sessions: number; total_sessions: number }> =
+    activeSessionsData?.data || {};
 
-  // Sort: active users first, then alphabetical
   const users = [...rawUsers].sort((a: any, b: any) => {
-    const aActive = activeMap[a.user_id] || 0;
-    const bActive = activeMap[b.user_id] || 0;
-    if (bActive !== aActive) return bActive - aActive;
-    return (a.user_name || "").localeCompare(b.user_name || "");
+    let aVal: any;
+    let bVal: any;
+    if (sortCol === "active_sessions") {
+      aVal = activeMap[a.user_id]?.active_sessions ?? 0;
+      bVal = activeMap[b.user_id]?.active_sessions ?? 0;
+    } else if (sortCol === "total_sessions") {
+      aVal = activeMap[a.user_id]?.total_sessions ?? 0;
+      bVal = activeMap[b.user_id]?.total_sessions ?? 0;
+    } else if (sortCol === "user_name") {
+      aVal = (a.user_name || "").toLowerCase();
+      bVal = (b.user_name || "").toLowerCase();
+    } else if (sortCol === "email") {
+      aVal = (a.email || "").toLowerCase();
+      bVal = (b.email || "").toLowerCase();
+    } else if (sortCol === "user_id") {
+      aVal = (a.user_id || "").toLowerCase();
+      bVal = (b.user_id || "").toLowerCase();
+    } else {
+      aVal = 0; bVal = 0;
+    }
+    if (aVal < bVal) return sortDir === "asc" ? -1 : 1;
+    if (aVal > bVal) return sortDir === "asc" ? 1 : -1;
+    return 0;
   });
 
-  const totalActiveUsers = Object.keys(activeMap).length;
-  const totalActiveSessions = Object.values(activeMap).reduce((sum, v) => sum + v, 0);
+  const totalActiveUsers = Object.values(activeMap).filter((v) => v.active_sessions > 0).length;
+  const totalActiveSessions = Object.values(activeMap).reduce((sum, v) => sum + v.active_sessions, 0);
 
   const sessions = sessionsData?.data?.sessions || [];
   const totalSessions = sessionsData?.data?.total || 0;
@@ -589,26 +624,63 @@ const AdminDashboard = () => {
                 <Box
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: "50px 1fr 1fr 140px 120px",
+                    gridTemplateColumns: "50px 1fr 1fr 140px 120px 120px",
                     gap: 2,
                     px: 3,
                     py: 1.5,
                     borderBottom: `1px solid ${COLORS.border}`,
                   }}
                 >
-                  {["", "Name", "Email", "Active Sessions", "User ID"].map((h) => (
-                    <Typography
-                      key={h || "avatar"}
-                      sx={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        color: COLORS.textSecondary,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      {h}
-                    </Typography>
-                  ))}
+                  {(
+                    [
+                      { label: "", col: null },
+                      { label: "Name", col: "user_name" },
+                      { label: "Email", col: "email" },
+                      { label: "Active Sessions", col: "active_sessions" },
+                      { label: "Total Sessions", col: "total_sessions" },
+                      { label: "User ID", col: "user_id" },
+                    ] as { label: string; col: string | null }[]
+                  ).map(({ label, col }) =>
+                    col ? (
+                      <Box
+                        key={col}
+                        onClick={() => handleColSort(col)}
+                        sx={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.25,
+                          cursor: "pointer",
+                          userSelect: "none",
+                          "&:hover .sort-icon": { opacity: 1 },
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            color: sortCol === col ? COLORS.accent : COLORS.textSecondary,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {label}
+                        </Typography>
+                        {sortCol === col ? (
+                          sortDir === "asc" ? (
+                            <KeyboardArrowUpIcon sx={{ fontSize: 16, color: COLORS.accent }} />
+                          ) : (
+                            <KeyboardArrowDownIcon sx={{ fontSize: 16, color: COLORS.accent }} />
+                          )
+                        ) : (
+                          <UnfoldMoreIcon
+                            className="sort-icon"
+                            sx={{ fontSize: 16, color: COLORS.textSecondary, opacity: 0.4, transition: "opacity 0.15s" }}
+                          />
+                        )}
+                      </Box>
+                    ) : (
+                      <Box key="avatar" />
+                    ),
+                  )}
                 </Box>
 
                 {/* Rows */}
@@ -618,7 +690,7 @@ const AdminDashboard = () => {
                     onClick={() => handleUserClick(user.user_id)}
                     sx={{
                       display: "grid",
-                      gridTemplateColumns: "50px 1fr 1fr 140px 120px",
+                      gridTemplateColumns: "50px 1fr 1fr 140px 120px 120px",
                       gap: 2,
                       px: 3,
                       py: 2,
@@ -664,7 +736,7 @@ const AdminDashboard = () => {
                         gap: 0.75,
                       }}
                     >
-                      {activeMap[user.user_id] ? (
+                      {activeMap[user.user_id]?.active_sessions > 0 ? (
                         <>
                           <FiberManualRecordIcon
                             sx={{
@@ -684,7 +756,7 @@ const AdminDashboard = () => {
                               color: "#10b981",
                             }}
                           >
-                            {activeMap[user.user_id]} active
+                            {activeMap[user.user_id].active_sessions} active
                           </Typography>
                         </>
                       ) : (
@@ -698,6 +770,11 @@ const AdminDashboard = () => {
                         </Typography>
                       )}
                     </Box>
+                    <Typography
+                      sx={{ fontSize: "13px", color: COLORS.textSecondary }}
+                    >
+                      {activeMap[user.user_id]?.total_sessions ?? "-"}
+                    </Typography>
                     <Chip
                       label={user.user_id}
                       size="small"

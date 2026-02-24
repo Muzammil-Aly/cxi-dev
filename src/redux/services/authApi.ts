@@ -356,7 +356,11 @@ export const authApi = createApi({
       },
     }),
     getActiveSessions: builder.query<
-      { status: number; data: Record<string, number>; message: string },
+      {
+        status: number;
+        data: Record<string, { active_sessions: number; total_sessions: number }>;
+        message: string;
+      },
       void
     >({
       query: () => `/sessions/active`,
