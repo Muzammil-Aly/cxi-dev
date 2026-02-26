@@ -51,7 +51,7 @@ export const customerApi = createApi({
         if (last_order_date) params.set("last_order_date", last_order_date);
         if (tab) params.set("tab", tab);
 
-        return `/customer_profiles/?${params.toString()}`;
+       return `/customer_profiles?${params.toString()}`;
       },
     }),
 
