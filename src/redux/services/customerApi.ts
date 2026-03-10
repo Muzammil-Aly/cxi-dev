@@ -50,7 +50,7 @@ export const customerApi = createApi({
         if (created_at) params.set("created_at", created_at);
         if (last_order_date) params.set("last_order_date", last_order_date);
         if (tab) params.set("tab", tab);
-        // made changes for webapp
+        // made changes for webapps
         return `/customer_profiles?${params.toString()}`;
       },
     }),
