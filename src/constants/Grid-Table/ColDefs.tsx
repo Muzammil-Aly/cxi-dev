@@ -247,6 +247,11 @@ export const orderItems = (
     suppressClickEdit: true,
     suppressNavigable: true,
   },
+  {
+    field: "estimated_delivery_date",
+    headerName: "Estimated Delivery Date",
+    cellRenderer: CopyCellRenderer,
+  },
   // {
   //   field: "item_type",
   //   headerName: "Item Type",

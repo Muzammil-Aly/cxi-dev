@@ -9,6 +9,7 @@ import { supportApi } from "./services/supportApi";
 import { eventsApi } from "./services/eventsApi";
 import { authApi } from "./services/authApi";
 import { PreferencesApi } from "./services/preferencesApi";
+import { shopifyApi } from "./services/shopifyApi";
 import tabReducer from "./slices/tabSlice";
 export const store = configureStore({
   reducer: {
@@ -24,6 +25,7 @@ export const store = configureStore({
     [inventoryApi.reducerPath]: inventoryApi.reducer,
     [authApi.reducerPath]: authApi.reducer,
     [PreferencesApi.reducerPath]: PreferencesApi.reducer,
+    [shopifyApi.reducerPath]: shopifyApi.reducer,
     tab: tabReducer,
   },
   middleware: (getDefaultMiddleware) =>
@@ -39,7 +41,8 @@ export const store = configureStore({
       .concat(eventsApi.middleware)
       .concat(inventoryApi.middleware)
       .concat(PreferencesApi.middleware)
-      .concat(authApi.middleware),
+      .concat(authApi.middleware)
+      .concat(shopifyApi.middleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

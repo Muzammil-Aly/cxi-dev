@@ -18,6 +18,10 @@ import {
   Tooltip,
   Button,
   Badge,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
 } from "@mui/material";
 
 import Loader from "@/components/Common/Loader";
@@ -61,7 +65,8 @@ import FilterAltOutlinedIcon from "@mui/icons-material/FilterAltOutlined";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import CircularLoader from "@/components/Common/CustomSearch/CircularLoader";
-
+import AddIcon from "@mui/icons-material/Add";
+import ShopifyOrderForm from "./ShopifyOrderForm";
 const Orders = ({ customerId }: { customerId?: string }) => {
   // Use column preferences hook
   const {
@@ -264,7 +269,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
   } = useGetFullfillmentStatusesQuery(FullfillmentInput, {
     skip: FullfillmentInput.trim().length < 1,
   });
-
+  const [openCreateOrder, setOpenCreateOrder] = useState(false);
   const rowData = useMemo(() => {
     const results = data?.data || [];
 
@@ -1243,6 +1248,36 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                 </Box>
               </Popover>
 
+              {userId === "kav1" && (
+                <>
+                  <Box display="flex" justifyContent="flex-end" mb={2}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<Add />}
+                      onClick={() => setOpenCreateOrder(true)}
+                    >
+                      Create Order
+                    </Button>
+                  </Box>
+                  <Dialog
+                    open={openCreateOrder}
+                    onClose={() => setOpenCreateOrder(false)}
+                    maxWidth="md"
+                    fullWidth
+                  >
+                    <DialogTitle>Create New Order</DialogTitle>
+                    <DialogContent>
+                      <ShopifyOrderForm />
+                    </DialogContent>
+                    <DialogActions>
+                      <Button onClick={() => setOpenCreateOrder(false)}>
+                        Cancel
+                      </Button>
+                    </DialogActions>
+                  </Dialog>
+                </>
+              )}
               {/* Reset all button (optional placement) */}
               {/* <Box sx={{ marginLeft: "auto" }}>
                 <Button

@@ -126,6 +126,9 @@ const OrderItems = ({
           sales_order_aging_days: item.sales_order_aging_days,
           shipping_agent_code: item.shipping_agent_code || "N/A",
           url: item.url || "N/A",
+          estimated_delivery_date: item.estimated_delivery_date
+            ? item.estimated_delivery_date.split("T")[0]
+            : "N/A",
         }))
       : [];
   }, [data]);

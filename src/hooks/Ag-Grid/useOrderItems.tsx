@@ -201,6 +201,13 @@ const useOrderItems = (columns: Column[]) => {
             flex: 1,
             minWidth: 220,
           };
+        case "estimated_delivery_date":
+          return {
+            ...col,
+            headerName: "Estimated Delivery Date",
+            flex: 1,
+            minWidth: 230,
+          };
         default:
           return { ...col, flex: 1, minWidth: 120 };
       }

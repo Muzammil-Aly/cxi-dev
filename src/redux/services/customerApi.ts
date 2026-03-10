@@ -51,13 +51,16 @@ export const customerApi = createApi({
         if (last_order_date) params.set("last_order_date", last_order_date);
         if (tab) params.set("tab", tab);
 
-        return `/customer_profiles/?${params.toString()}`;
+        return `/customer_profiles?${params.toString()}`;
       },
     }),
 
-    getCustomerSegment: builder.query<any, { custId: string; source?: string }>({
-      query: ({ custId, source }) => `customer_segments?cust_id=${custId}${source ? `&source=${source}` : ""}`,
-    }),
+    getCustomerSegment: builder.query<any, { custId: string; source?: string }>(
+      {
+        query: ({ custId, source }) =>
+          `customer_segments?cust_id=${custId}${source ? `&source=${source}` : ""}`,
+      },
+    ),
 
     getSegments: builder.query<any, { page?: number; page_size?: number }>({
       query: ({ page, page_size } = {}) => {

@@ -5344,7 +5344,7 @@ const prepareTimelineGroups = (interactions: any[]) => {
       new Date(prev.created_at).getTime();
 
     if (
-      (sameEndpoint || (sameTab && sameMainParams)) &&
+      (sameEndpoint && sameMainParams) &&
       timeDiff < 300000 // 5 minutes
     ) {
       currentGroup.push(curr);

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -56,6 +56,21 @@ const COLORS = {
 const formatDate = (dateString: string | null) => {
   if (!dateString) return "N/A";
   return dayjs(dateString).format("MMM D, YYYY h:mm A");
+};
+
+const formatTimeOnly = (dateString: string | null) => {
+  if (!dateString) return "";
+  return dayjs(dateString).format("h:mm:ss A");
+};
+
+const formatDurationHMS = (ms: number) => {
+  const totalSecs = Math.floor(ms / 1000);
+  const h = Math.floor(totalSecs / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
 };
 
 const truncateSessionId = (sessionId: string) => {
@@ -143,28 +158,52 @@ const prepareTimelineGroups = (interactions: any[]) => {
     (a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   );
-  const groupsMap: Record<string, any[]> = {};
-  sorted.forEach((interaction) => {
+  // Attach duration to each action = time until next action
+  const withDuration = sorted.map((interaction, i) => {
+    const next = sorted[i + 1];
+    const _duration = next
+      ? new Date(next.created_at).getTime() - new Date(interaction.created_at).getTime()
+      : null;
+    return { ...interaction, _duration };
+  });
+  // Group consecutive same-tab interactions (run-length encoding).
+  // A new group starts whenever the tab changes, so "Orders → Inventory → Orders"
+  // produces three groups instead of merging both Orders runs together.
+  const groups: Array<{ tab: string; actions: any[] }> = [];
+  withDuration.forEach((interaction) => {
     const { tab } = parseQueryParams(interaction.query_params);
     const key =
       tab || ENDPOINT_LABEL_MAP[interaction.endpoint] || interaction.endpoint;
-    if (!groupsMap[key]) groupsMap[key] = [];
-    groupsMap[key].push(interaction);
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && lastGroup.tab === key) {
+      lastGroup.actions.push(interaction);
+    } else {
+      groups.push({ tab: key, actions: [interaction] });
+    }
   });
-  return Object.entries(groupsMap).map(([tab, actions]) => ({
-    tab,
-    actions,
-  }));
+  return groups;
 };
 
 const formatDuration = (minutes: number | null | undefined) => {
   if (minutes == null) return "-";
-  if (minutes >= 60) {
-    const h = Math.floor(minutes / 60);
-    const m = Math.round(minutes % 60);
-    return `${h}h ${m}m`;
-  }
-  return `${minutes} min`;
+  const totalMins = Math.floor(minutes);
+  const d = Math.floor(totalMins / 1440);
+  const h = Math.floor((totalMins % 1440) / 60);
+  const m = totalMins % 60;
+  if (d > 0) return `${d}d ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return "0s";
+};
+
+const formatDurationHM = (minutes: number | null | undefined) => {
+  if (minutes == null) return "-";
+  const totalMins = Math.floor(minutes);
+  const h = Math.floor(totalMins / 60);
+  const m = totalMins % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return "0s";
 };
 
 const SESSION_PAGE_SIZE_OPTIONS = [10, 20, 50];
@@ -177,7 +216,7 @@ const STAT_CARDS = [
     key: "avg_session_time_minutes",
     label: "Avg Session Time",
     color: "#F59E0B",
-    format: formatDuration,
+    format: formatDurationHM,
   },
   {
     key: "total_session_duration_minutes",
@@ -256,6 +295,8 @@ const AdminDashboard = () => {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     null,
   );
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
+  const [interactionsTransitioning, setInteractionsTransitioning] = useState(false);
 
   // Pagination
   const [sessionsPage, setSessionsPage] = useState(1);
@@ -335,6 +376,19 @@ const AdminDashboard = () => {
     { skip: !selectedSessionId || !selectedUserId },
   );
 
+  useEffect(() => {
+    if (selectedUserId && !sessionsLoading && !sessionsFetching && sessionsData) {
+      const t = setTimeout(() => setLoadedUserId(selectedUserId), 400);
+      return () => clearTimeout(t);
+    }
+  }, [selectedUserId, sessionsLoading, sessionsFetching, sessionsData]);
+
+  useEffect(() => {
+    if (!interactionsLoading && !interactionsFetching && interactionsData) {
+      setInteractionsTransitioning(false);
+    }
+  }, [interactionsLoading, interactionsFetching, interactionsData]);
+
   const rawUsers = usersData?.data || [];
   const activeMap: Record<string, { active_sessions: number; total_sessions: number }> =
     activeSessionsData?.data || {};
@@ -379,6 +433,7 @@ const AdminDashboard = () => {
 
   // ── Handlers ──
   const handleUserClick = (userId: string) => {
+    setLoadedUserId(null);
     setSelectedUserId(userId);
     setSelectedSessionId(null);
     setSessionsPage(1);
@@ -386,6 +441,7 @@ const AdminDashboard = () => {
   };
 
   const handleSessionClick = (sessionId: string) => {
+    setInteractionsTransitioning(true);
     setSelectedSessionId(sessionId);
     setInteractionPage(1);
   };
@@ -396,7 +452,11 @@ const AdminDashboard = () => {
       setInteractionPage(1);
     } else {
       setSelectedUserId(null);
+      setLoadedUserId(null);
       setSessionsPage(1);
+      setStartDate(null);
+      setEndDate(null);
+      setDateFilter(undefined);
     }
   };
 
@@ -793,37 +853,50 @@ const AdminDashboard = () => {
         ) : !selectedSessionId ? (
           /* ─── USER SESSIONS LIST ─── */
           <>
-            <Box
-              sx={{
-                px: 3,
-                py: 2,
-                borderBottom: `1px solid ${COLORS.border}`,
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-              }}
-            >
-              <PersonIcon sx={{ color: COLORS.accent, fontSize: 20 }} />
-              <Typography
-                sx={{
-                  fontWeight: 600,
-                  fontSize: "15px",
-                  color: COLORS.textPrimary,
-                }}
-              >
-                Sessions
-              </Typography>
-            </Box>
-
-            {sessionsLoading || sessionsFetching ? (
+            {sessionsLoading || sessionsFetching || loadedUserId !== selectedUserId ? (
               <Box
                 sx={{
                   display: "flex",
+                  flexDirection: "column",
                   justifyContent: "center",
-                  p: 6,
+                  alignItems: "center",
+                  gap: 1.5,
+                  minHeight: 280,
                 }}
               >
-                <CircularProgress sx={{ color: COLORS.accent }} size={32} />
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    border: `4px solid ${COLORS.accent}25`,
+                    borderTopColor: COLORS.accent,
+                    borderRightColor: COLORS.accent,
+                    animation: "spin 0.7s linear infinite",
+                    "@keyframes spin": {
+                      from: { transform: "rotate(0deg)" },
+                      to: { transform: "rotate(360deg)" },
+                    },
+                  }}
+                />
+                <Typography
+                  sx={{
+                    color: COLORS.textPrimary,
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    mt: 1,
+                  }}
+                >
+                  Loading sessions
+                </Typography>
+                <Typography
+                  sx={{
+                    color: COLORS.textSecondary,
+                    fontSize: "12px",
+                  }}
+                >
+                  Fetching activity for this user…
+                </Typography>
               </Box>
             ) : sessions.length === 0 ? (
               <Box sx={{ textAlign: "center", p: 6 }}>
@@ -966,7 +1039,7 @@ const AdminDashboard = () => {
                         >
                           {session.duration_minutes === null
                             ? "Ongoing"
-                            : `${session.duration_minutes}m`}
+                            : formatDuration(session.duration_minutes)}
                         </Typography>
                       </Box>
                       <Typography
@@ -1069,15 +1142,50 @@ const AdminDashboard = () => {
         ) : (
           /* ─── SESSION INTERACTIONS TIMELINE ─── */
           <>
-            {interactionsLoading || interactionsFetching ? (
+            {interactionsLoading || interactionsFetching || interactionsTransitioning ? (
               <Box
                 sx={{
                   display: "flex",
+                  flexDirection: "column",
                   justifyContent: "center",
-                  p: 6,
+                  alignItems: "center",
+                  gap: 1.5,
+                  minHeight: 280,
                 }}
               >
-                <CircularProgress sx={{ color: COLORS.accent }} size={32} />
+                <Box
+                  sx={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: "50%",
+                    border: `4px solid ${COLORS.accent}25`,
+                    borderTopColor: COLORS.accent,
+                    borderRightColor: COLORS.accent,
+                    animation: "spin 0.7s linear infinite",
+                    "@keyframes spin": {
+                      from: { transform: "rotate(0deg)" },
+                      to: { transform: "rotate(360deg)" },
+                    },
+                  }}
+                />
+                <Typography
+                  sx={{
+                    color: COLORS.textPrimary,
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    mt: 1,
+                  }}
+                >
+                  Loading activity
+                </Typography>
+                <Typography
+                  sx={{
+                    color: COLORS.textSecondary,
+                    fontSize: "12px",
+                  }}
+                >
+                  Fetching session interactions…
+                </Typography>
               </Box>
             ) : interactions.length === 0 ? (
               <Box sx={{ textAlign: "center", p: 6 }}>
@@ -1160,12 +1268,38 @@ const AdminDashboard = () => {
                             );
                             return (
                               <Box key={action.id} sx={{ mb: 0.5 }}>
-                                <Typography
-                                  variant="body2"
-                                  sx={{ color: COLORS.textPrimary }}
-                                >
-                                  {label}
-                                </Typography>
+                                <Box sx={{ display: "flex", alignItems: "baseline", gap: 1, flexWrap: "wrap" }}>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: COLORS.textSecondary,
+                                      fontFamily: "monospace",
+                                      fontSize: "0.72rem",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {formatTimeOnly(action.created_at)}
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ color: COLORS.textPrimary }}
+                                  >
+                                    {label}
+                                  </Typography>
+                                  {action._duration != null && action._duration > 0 && (
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: "#10B981",
+                                        fontFamily: "monospace",
+                                        fontSize: "0.72rem",
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      ⏱ {formatDurationHMS(action._duration)}
+                                    </Typography>
+                                  )}
+                                </Box>
                                 {params !== "-" && (
                                   <Typography
                                     variant="caption"
