@@ -1248,7 +1248,7 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                 </Box>
               </Popover>
 
-              {userId === "kav1" && (
+              {(userId === "kav1" || userId === "mdb1") && (
                 <>
                   <Box display="flex" justifyContent="flex-end" mb={2}>
                     <Button
