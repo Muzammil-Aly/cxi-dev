@@ -2,6 +2,8 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { baseQueryWithReauth } from "../baseQueryWithReauth";
 
+export type ShopifyStore = "store1" | "store2" | "store3";
+
 export interface ProductVariant {
   id: string; // gid://shopify/ProductVariant/...
   title: string;
@@ -27,13 +29,18 @@ export const shopifyApi = createApi({
   reducerPath: "shopifyApi",
   baseQuery: baseQueryWithReauth,
   endpoints: (builder) => ({
-    getProducts: builder.query<ShopifyProduct[], void>({
-      query: () => ({ url: "/shopify/products", method: "GET" }),
-      transformResponse: (response: { data: ShopifyProduct[] }) => response.data,
+    getProducts: builder.query<ShopifyProduct[], ShopifyStore>({
+      query: (store = "store1") => ({
+        url: `/shopify/products?store=${store}`,
+        method: "GET",
+      }),
+      transformResponse: (response: { data: ShopifyProduct[] }) =>
+        response.data,
     }),
     createOrder: builder.mutation<
       any,
       {
+        store?: ShopifyStore;
         email: string;
         financialStatus?: string;
         note?: string;
@@ -51,35 +58,24 @@ export const shopifyApi = createApi({
           zip: string;
           phone?: string;
         };
-        // billingAddress: {
-        //   firstName: string;
-        //   lastName: string;
-        //   address1: string;
-        //   address2?: string;
-        //   company?: string;
-        //   city: string;
-        //   provinceCode: string;
-        //   countryCode: string;
-        //   zip: string;
-        // };
         inventoryBehaviour?: "BYPASS" | "DECREMENT" | "RELEASE";
         sendReceipt?: boolean;
         sendFulfillmentReceipt?: boolean;
       }
     >({
       query: ({
+        store = "store1",
         email,
         financialStatus,
         note,
         tags = [],
         lineItems,
         shippingAddress,
-        // billingAddress,
         inventoryBehaviour = "BYPASS",
         sendReceipt = false,
         sendFulfillmentReceipt = false,
       }) => ({
-        url: "/shopify/create-order",
+        url: `/shopify/create-order?store=${store}`,
         method: "POST",
         body: {
           order: {
@@ -89,7 +85,6 @@ export const shopifyApi = createApi({
             tags,
             lineItems,
             shippingAddress,
-            // billingAddress,
           },
           inventoryBehaviour,
           sendReceipt,

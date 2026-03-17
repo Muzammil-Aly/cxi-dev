@@ -5,13 +5,18 @@ import {
   useGetProductsQuery,
   type ProductVariant,
   type ShopifyProduct,
+  type ShopifyStore,
 } from "../../redux/services/shopifyApi";
 import {
   Autocomplete,
   Button,
   CircularProgress,
   Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   TextField,
   Typography,
 } from "@mui/material";
@@ -61,9 +66,17 @@ const defaultAddress: Address = {
   phone: "",
 };
 
+const STORE_OPTIONS: { value: ShopifyStore; label: string }[] = [
+  { value: "store1", label: "Store 1" },
+  { value: "store2", label: "Store 2" },
+  { value: "store3", label: "Store 3" },
+];
+
 const ShopifyOrderForm: React.FC = () => {
+  const [selectedStore, setSelectedStore] = useState<ShopifyStore>("store1");
   const [createOrder, { isLoading, data, error }] = useCreateOrderMutation();
-  const { data: products, isLoading: productsLoading } = useGetProductsQuery();
+  const { data: products, isLoading: productsLoading } =
+    useGetProductsQuery(selectedStore);
 
   const variantOptions = useMemo<VariantOption[]>(() => {
     if (!products) return [];
@@ -126,6 +139,7 @@ const ShopifyOrderForm: React.FC = () => {
     e.preventDefault();
     try {
       await createOrder({
+        store: selectedStore,
         email: form.email,
         lineItems: form.lineItems,
         shippingAddress: form.shippingAddress,
@@ -169,6 +183,28 @@ const ShopifyOrderForm: React.FC = () => {
 
   return (
     <form onSubmit={handleSubmit}>
+      {/* Store Selector */}
+      <Paper elevation={2} style={sectionStyle}>
+        <Typography variant="h6" gutterBottom>
+          Select Store
+        </Typography>
+        <FormControl fullWidth>
+          <InputLabel id="store-select-label">Store</InputLabel>
+          <Select
+            labelId="store-select-label"
+            value={selectedStore}
+            label="Store"
+            onChange={(e) => setSelectedStore(e.target.value as ShopifyStore)}
+          >
+            {STORE_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Paper>
+
       {/* Customer Info */}
       <Paper elevation={2} style={sectionStyle}>
         <Typography variant="h6" gutterBottom>
