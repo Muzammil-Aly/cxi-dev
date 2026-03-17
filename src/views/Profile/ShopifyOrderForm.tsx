@@ -67,8 +67,8 @@ const defaultAddress: Address = {
 };
 
 const STORE_OPTIONS: { value: ShopifyStore; label: string }[] = [
-  { value: "store1", label: "Store 1" },
-  { value: "store2", label: "Store 2" },
+  { value: "store1", label: "Testing" },
+  { value: "store2", label: "MDB CO" },
   { value: "store3", label: "Store 3" },
 ];
 
