@@ -921,13 +921,6 @@ const Orders = ({ customerId }: { customerId?: string }) => {
               </Box>
 
               <Box display="flex" alignItems="center" gap={2} flexWrap="wrap">
-                {/* <CustomDatePicker
-                  label="Order Date"
-                  value={dateInput}
-                  setValue={setDateInput}
-                  setFilter={setDateFilter}
-                  setPage={setPage}
-                /> */}
                 <CustomDateRangePicker
                   startDate={startDate}
                   endDate={endDate}
@@ -946,11 +939,12 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                     setPage(1);
                   }}
                 />
+
               </Box>
             </Box>
 
             {/* ---------------- Dynamic Filters Row (NEW) ---------------- */}
-            <Box display="flex" flexWrap="wrap" gap={2} alignItems="center">
+            <Box display="flex" flexWrap="wrap" gap={2} alignItems="center" justifyContent="space-between">
               {/* Always visible 3 filters */}
               <SearchInput
                 label="Order ID"
@@ -1192,25 +1186,52 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                 );
               })}
 
-              {/* Add Filters popover (icon button) */}
-              <Tooltip title="Add Filters">
-                <IconButton
-                  color="default"
-                  onClick={(e) => setAnchorElFilters(e.currentTarget)}
-                  size="medium"
-                >
-                  <Badge
-                    color="primary"
-                    variant="dot"
-                    invisible={!hasActiveFilters}
-                    overlap="circular"
+              <Box display="flex" alignItems="center" gap={1} ml="auto">
+                {/* Add Filters popover (icon button) */}
+                <Tooltip title="Add Filters">
+                  <IconButton
+                    color="default"
+                    onClick={(e) => setAnchorElFilters(e.currentTarget)}
+                    size="medium"
                   >
-                    <FilterListIcon
-                      color={hasActiveFilters ? "primary" : "inherit"}
-                    />
-                  </Badge>
-                </IconButton>
-              </Tooltip>
+                    <Badge
+                      color="primary"
+                      variant="dot"
+                      invisible={!hasActiveFilters}
+                      overlap="circular"
+                    >
+                      <FilterListIcon
+                        color={hasActiveFilters ? "primary" : "inherit"}
+                      />
+                    </Badge>
+                  </IconButton>
+                </Tooltip>
+
+                {(userId === "kav1" || userId === "mdb1") && (
+                  <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => setOpenCreateOrder(true)}
+                    sx={{
+                      background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: "14px",
+                      borderRadius: "8px",
+                      padding: "8px 20px",
+                      textTransform: "none",
+                      whiteSpace: "nowrap",
+                      boxShadow: "0 4px 14px rgba(99, 102, 241, 0.4)",
+                      "&:hover": {
+                        background: "linear-gradient(135deg, #4338ca 0%, #6d28d9 100%)",
+                        boxShadow: "0 6px 20px rgba(99, 102, 241, 0.55)",
+                      },
+                    }}
+                  >
+                    Create Order
+                  </Button>
+                )}
+              </Box>
 
               <Popover
                 open={Boolean(anchorElFilters)}
@@ -1238,7 +1259,6 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                       control={
                         <Checkbox
                           checked={activeFilters.includes(f.key)}
-                          // onChange={() => handleToggleFilter(f.key)}
                           onChange={() => handleToggleFilterWithSave(f.key)}
                         />
                       }
@@ -1250,31 +1270,34 @@ const Orders = ({ customerId }: { customerId?: string }) => {
 
               {(userId === "kav1" || userId === "mdb1") && (
                 <>
-                  <Box display="flex" justifyContent="flex-end" mb={2}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      startIcon={<Add />}
-                      onClick={() => setOpenCreateOrder(true)}
-                    >
-                      Create Order
-                    </Button>
-                  </Box>
                   <Dialog
                     open={openCreateOrder}
                     onClose={() => setOpenCreateOrder(false)}
                     maxWidth="md"
                     fullWidth
+                    PaperProps={{ sx: { borderRadius: "16px", overflow: "hidden", m: 0 } }}
                   >
-                    <DialogTitle>Create New Order</DialogTitle>
-                    <DialogContent>
-                      <ShopifyOrderForm />
+                    <DialogContent
+                      sx={{
+                        p: 0,
+                        overflowY: "auto",
+                        "&::-webkit-scrollbar": {
+                          width: "5px",
+                        },
+                        "&::-webkit-scrollbar-track": {
+                          background: "transparent",
+                        },
+                        "&::-webkit-scrollbar-thumb": {
+                          background: "rgba(99, 102, 241, 0.35)",
+                          borderRadius: "10px",
+                        },
+                        "&::-webkit-scrollbar-thumb:hover": {
+                          background: "rgba(99, 102, 241, 0.65)",
+                        },
+                      }}
+                    >
+                      <ShopifyOrderForm onClose={() => setOpenCreateOrder(false)} />
                     </DialogContent>
-                    <DialogActions>
-                      <Button onClick={() => setOpenCreateOrder(false)}>
-                        Cancel
-                      </Button>
-                    </DialogActions>
                   </Dialog>
                 </>
               )}
