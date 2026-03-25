@@ -1399,7 +1399,8 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                   {/* Gradient Header */}
                   <Box
                     sx={{
-                      background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                      background:
+                        "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
                       px: 2,
                       py: 1.75,
                       display: "flex",
@@ -1464,11 +1465,20 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                           borderRadius: "8px",
                           fontSize: "13px",
                           backgroundColor: "#F9FAFB",
-                          "& fieldset": { borderColor: "#E5E7EB", borderWidth: "1.5px" },
+                          "& fieldset": {
+                            borderColor: "#E5E7EB",
+                            borderWidth: "1.5px",
+                          },
                           "&:hover fieldset": { borderColor: "#C4B5FD" },
-                          "&.Mui-focused fieldset": { borderColor: "#6366F1", borderWidth: "1.5px" },
+                          "&.Mui-focused fieldset": {
+                            borderColor: "#6366F1",
+                            borderWidth: "1.5px",
+                          },
                         },
-                        "& .MuiInputBase-input::placeholder": { color: "#9CA3AF", fontSize: "13px" },
+                        "& .MuiInputBase-input::placeholder": {
+                          color: "#9CA3AF",
+                          fontSize: "13px",
+                        },
                       }}
                     />
                   </Box>
@@ -1496,7 +1506,9 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                       px: 1,
                       pb: 0.5,
                       "&::-webkit-scrollbar": { width: "4px" },
-                      "&::-webkit-scrollbar-track": { background: "transparent" },
+                      "&::-webkit-scrollbar-track": {
+                        background: "transparent",
+                      },
                       "&::-webkit-scrollbar-thumb": {
                         background: "rgba(99,102,241,0.3)",
                         borderRadius: "8px",
@@ -1528,7 +1540,9 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                               cursor: "pointer",
                               transition: "background 0.12s",
                               bgcolor: isChecked ? "#F5F3FF" : "transparent",
-                              "&:hover": { bgcolor: isChecked ? "#EDE9FE" : "#F9FAFB" },
+                              "&:hover": {
+                                bgcolor: isChecked ? "#EDE9FE" : "#F9FAFB",
+                              },
                             }}
                             onClick={() =>
                               setPendingFilters((prev) =>
@@ -1564,7 +1578,9 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                   </Box>
 
                   {/* Divider */}
-                  <Box sx={{ borderTop: "1px solid #F3F4F6", mx: 1.5, mt: 0.5 }} />
+                  <Box
+                    sx={{ borderTop: "1px solid #F3F4F6", mx: 1.5, mt: 0.5 }}
+                  />
 
                   {/* Footer */}
                   <Box sx={{ px: 1.5, pt: 1.25, pb: 1.5 }}>
@@ -1573,7 +1589,8 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                       fullWidth
                       onClick={handleApplyFilters}
                       sx={{
-                        background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                        background:
+                          "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
                         borderRadius: "8px",
                         textTransform: "none",
                         fontWeight: 700,
@@ -1582,7 +1599,8 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                         boxShadow: "0 4px 14px rgba(99,102,241,0.35)",
                         letterSpacing: "0.01em",
                         "&:hover": {
-                          background: "linear-gradient(135deg, #4338ca 0%, #6d28d9 100%)",
+                          background:
+                            "linear-gradient(135deg, #4338ca 0%, #6d28d9 100%)",
                           boxShadow: "0 6px 20px rgba(99,102,241,0.5)",
                         },
                       }}
@@ -1604,7 +1622,10 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                           fontWeight: 600,
                           color: "#6366F1",
                           cursor: "pointer",
-                          "&:hover": { color: "#4338CA", textDecoration: "underline" },
+                          "&:hover": {
+                            color: "#4338CA",
+                            textDecoration: "underline",
+                          },
                         }}
                         onClick={() => setPendingFilters([])}
                       >
