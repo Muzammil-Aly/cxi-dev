@@ -34,6 +34,7 @@ export interface ShopifyProduct {
 export interface ShopifyOrderAddress {
   firstName: string;
   lastName: string;
+  company?: string;
   address1: string;
   address2?: string;
   city: string;
@@ -221,7 +222,7 @@ export const shopifyApi = createApi({
     }),
 
     getOrderLineItems: builder.query<
-      Array<{ id: string; title: string; quantity: number; sku: string | null }>,
+      { lineItems: Array<{ id: string; title: string; quantity: number; sku: string | null }>; shippingAddress: ShopifyOrderAddress | null },
       { orderId: string; store?: ShopifyStore }
     >({
       query: ({ orderId, store = "store1" }) => ({
@@ -230,7 +231,7 @@ export const shopifyApi = createApi({
       }),
       transformResponse: (response: { data: any }) => {
         const edges = response?.data?.lineItems?.edges ?? [];
-        return edges
+        const lineItems = edges
           .filter(({ node }: any) => (node.currentQuantity ?? node.quantity ?? 0) > 0)
           .map(({ node }: any) => ({
           id: node.id ?? "",
@@ -238,6 +239,7 @@ export const shopifyApi = createApi({
           quantity: node.currentQuantity ?? node.quantity ?? 0,
           sku: node.sku?.sku ?? null,
         }));
+        return { lineItems, shippingAddress: response?.data?.shippingAddress ?? null };
       },
     }),
 

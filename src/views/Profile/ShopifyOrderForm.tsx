@@ -560,8 +560,12 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   // ── Edit mode: order search ───────────────────────────────────────────────
   const [editSearchInput, setEditSearchInput] = useState("");
-  const [editSearchFilter, setEditSearchFilter] = useState<string | undefined>(undefined);
-  const editSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editSearchFilter, setEditSearchFilter] = useState<string | undefined>(
+    undefined,
+  );
+  const editSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const buildShopifyQuery = (input: string): string | undefined => {
     const trimmed = input.trim();
@@ -597,6 +601,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         ...prev,
         firstName: addr.firstName || prev.firstName,
         lastName: addr.lastName || prev.lastName,
+        company: addr.company || prev.company,
         address1: addr.address1 || prev.address1,
         address2: addr.address2 || prev.address2,
         city: addr.city || prev.city,
@@ -611,9 +616,13 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   // ── Edit draft mode: order search ────────────────────────────────────────
   const [draftSearchInput, setDraftSearchInput] = useState("");
-  const [draftSearchFilter, setDraftSearchFilter] = useState<string | undefined>(undefined);
+  const [draftSearchFilter, setDraftSearchFilter] = useState<
+    string | undefined
+  >(undefined);
   const [draftSelectedOrder, setDraftSelectedOrder] = useState<any>(null);
-  const draftSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const { data: editDraftOrdersData, isFetching: isDraftOrderSearching } =
     useGetShopifyDraftOrdersQuery(
@@ -635,6 +644,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         ...prev,
         firstName: addr.firstName || prev.firstName,
         lastName: addr.lastName || prev.lastName,
+        company: addr.company || prev.company,
         address1: addr.address1 || prev.address1,
         address2: addr.address2 || prev.address2,
         city: addr.city || prev.city,
@@ -667,17 +677,30 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   // Load existing line items for the order being edited
   const [loadLineItemsOrderId, setLoadLineItemsOrderId] = useState<string>("");
-  const { data: existingLineItems = [], isFetching: isLoadingLineItems } =
+  const { data: orderDetailData, isFetching: isLoadingLineItems } =
     useGetOrderLineItemsQuery(
       { orderId: loadLineItemsOrderId, store: selectedStore },
       { skip: !loadLineItemsOrderId },
     );
+  const existingLineItems = orderDetailData?.lineItems ?? [];
+
+  // Sync company from order detail response (list endpoint may not include it)
+  useEffect(() => {
+    if (orderDetailData?.shippingAddress?.company) {
+      setEditAddr((prev) => ({
+        ...prev,
+        company: orderDetailData.shippingAddress!.company || prev.company,
+      }));
+    }
+  }, [orderDetailData]);
 
   // ── Edit mode: state ──────────────────────────────────────────────────────
   const [editOrderId, setEditOrderId] = useState("");
   const [editDraftOrderId, setEditDraftOrderId] = useState("");
   const [editSelectedOrder, setEditSelectedOrder] = useState<any>(null);
-  const [removedLineItemIds, setRemovedLineItemIds] = useState<Set<string>>(new Set());
+  const [removedLineItemIds, setRemovedLineItemIds] = useState<Set<string>>(
+    new Set(),
+  );
   const [editEmail, setEditEmail] = useState("");
   const [editAddr, setEditAddr] = useState({ ...defaultAddress });
   const [customAttrs, setCustomAttrs] = useState<CustomAttribute[]>([]);
@@ -703,9 +726,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     setDraftSearchInput("");
     setDraftSearchFilter(undefined);
     setRemovedLineItemIds(new Set());
-  }, [mode]);
-
-  // Reset all form state when store changes
+  }, [mode]); // Reset all form state when store changes
   useEffect(() => {
     // Create mode
     setForm({
@@ -935,7 +956,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     const filledOperations = operations.filter((op) => {
       if (op.type === "addVariant") return op.variantId.trim() !== "";
       if (op.type === "setQuantity") return op.lineItemId.trim() !== "";
-      if (op.type === "addDiscount") return op.lineItemId.trim() !== "" && op.discountValue.trim() !== "";
+      if (op.type === "addDiscount")
+        return op.lineItemId.trim() !== "" && op.discountValue.trim() !== "";
       return false;
     });
     const ops = filledOperations.map((op) => {
@@ -1765,7 +1787,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               <Autocomplete
                 options={editOrderSuggestions}
                 loading={isEditOrderSearching}
-                getOptionLabel={(o: any) => o.name || o.id?.split("/").pop() || ""}
+                getOptionLabel={(o: any) =>
+                  o.name || o.id?.split("/").pop() || ""
+                }
                 isOptionEqualToValue={(o: any, v: any) => o.id === v.id}
                 filterOptions={(x) => x}
                 value={editSelectedOrder}
@@ -1773,7 +1797,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 onInputChange={(_, val, reason) => {
                   if (reason === "input") {
                     setEditSearchInput(val);
-                    if (editSearchDebounceRef.current) clearTimeout(editSearchDebounceRef.current);
+                    if (editSearchDebounceRef.current)
+                      clearTimeout(editSearchDebounceRef.current);
                     editSearchDebounceRef.current = setTimeout(() => {
                       setEditSearchFilter(buildShopifyQuery(val));
                     }, 400);
@@ -1798,15 +1823,58 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   const numericId = option.id?.split("/").pop() || "";
                   return (
                     <li key={key} {...liProps} style={{ padding: "6px 12px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "nowrap", overflow: "hidden" }}>
-                        <span style={{ fontWeight: 600, color: "#4f46e5", fontSize: "12px", whiteSpace: "nowrap" }}>{option.name}</span>
-                        <span style={{ color: "#9ca3af", fontSize: "11px", whiteSpace: "nowrap" }}>#{numericId}</span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          flexWrap: "nowrap",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: 600,
+                            color: "#4f46e5",
+                            fontSize: "12px",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {option.name}
+                        </span>
+                        <span
+                          style={{
+                            color: "#9ca3af",
+                            fontSize: "11px",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          #{numericId}
+                        </span>
                         {option.email && (
-                          <span style={{ color: "#6b7280", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{option.email}</span>
+                          <span
+                            style={{
+                              color: "#6b7280",
+                              fontSize: "11px",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {option.email}
+                          </span>
                         )}
                         {option.shippingAddress?.firstName && (
-                          <span style={{ color: "#9ca3af", fontSize: "11px", whiteSpace: "nowrap", marginLeft: "auto" }}>
-                            {option.shippingAddress.firstName} {option.shippingAddress.lastName}
+                          <span
+                            style={{
+                              color: "#9ca3af",
+                              fontSize: "11px",
+                              whiteSpace: "nowrap",
+                              marginLeft: "auto",
+                            }}
+                          >
+                            {option.shippingAddress.firstName}{" "}
+                            {option.shippingAddress.lastName}
                           </span>
                         )}
                       </div>
@@ -1822,7 +1890,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                       "& .MuiOutlinedInput-root": {
                         borderRadius: "8px",
                         fontSize: "14px",
-                        "& fieldset": { borderColor: editOrderId ? "#6366f1" : "#e5e7eb" },
+                        "& fieldset": {
+                          borderColor: editOrderId ? "#6366f1" : "#e5e7eb",
+                        },
                       },
                     }}
                     slotProps={{
@@ -1830,7 +1900,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                         ...params.InputProps,
                         endAdornment: (
                           <>
-                            {isEditOrderSearching && <CircularProgress color="inherit" size={14} />}
+                            {isEditOrderSearching && (
+                              <CircularProgress color="inherit" size={14} />
+                            )}
                             {params.InputProps.endAdornment}
                           </>
                         ),
@@ -1839,7 +1911,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   />
                 )}
               />
-              <span style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}>
+              <span
+                style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}
+              >
                 Type order # (e.g. 1001) or email to search
               </span>
             </div>
@@ -2072,23 +2146,51 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             <form onSubmit={handleEditLineItems}>
               {/* Line items auto-load when order is selected */}
               {isLoadingLineItems && (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", color: "#9ca3af", fontSize: "13px" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    marginBottom: "16px",
+                    color: "#9ca3af",
+                    fontSize: "13px",
+                  }}
+                >
                   <CircularProgress size={14} />
                   Loading line items…
                 </div>
               )}
-              {!editOrderId.trim() && !isLoadingLineItems && existingLineItems.length === 0 && (
-                <div style={{ marginBottom: "16px", fontSize: "13px", color: "#9ca3af" }}>
-                  Select an order above to load its line items.
-                </div>
-              )}
+              {!editOrderId.trim() &&
+                !isLoadingLineItems &&
+                existingLineItems.length === 0 && (
+                  <div
+                    style={{
+                      marginBottom: "16px",
+                      fontSize: "13px",
+                      color: "#9ca3af",
+                    }}
+                  >
+                    Select an order above to load its line items.
+                  </div>
+                )}
 
               {existingLineItems.length > 0 && (
                 <div style={{ marginBottom: "20px" }}>
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 700,
+                      color: "#6b7280",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      marginBottom: "10px",
+                    }}
+                  >
                     Loaded Line Items — click × to remove
                   </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  <div
+                    style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}
+                  >
                     {existingLineItems.map((item) => {
                       const pendingRemove = removedLineItemIds.has(item.id);
                       return (
@@ -2107,17 +2209,43 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                           }}
                         >
                           <div>
-                            <span style={{ fontWeight: 600, color: pendingRemove ? "#dc2626" : "#111827", textDecoration: pendingRemove ? "line-through" : "none" }}>
+                            <span
+                              style={{
+                                fontWeight: 600,
+                                color: pendingRemove ? "#dc2626" : "#111827",
+                                textDecoration: pendingRemove
+                                  ? "line-through"
+                                  : "none",
+                              }}
+                            >
                               {item.title}
                             </span>
                             {item.sku && (
-                              <span style={{ marginLeft: "6px", color: "#9ca3af", fontSize: "11px" }}>SKU: {item.sku}</span>
+                              <span
+                                style={{
+                                  marginLeft: "6px",
+                                  color: "#9ca3af",
+                                  fontSize: "11px",
+                                }}
+                              >
+                                SKU: {item.sku}
+                              </span>
                             )}
-                            <span style={{ marginLeft: "8px", color: "#6b7280", fontSize: "12px" }}>× {item.quantity}</span>
+                            <span
+                              style={{
+                                marginLeft: "8px",
+                                color: "#6b7280",
+                                fontSize: "12px",
+                              }}
+                            >
+                              × {item.quantity}
+                            </span>
                           </div>
                           <button
                             type="button"
-                            title={pendingRemove ? "Undo removal" : "Remove item"}
+                            title={
+                              pendingRemove ? "Undo removal" : "Remove item"
+                            }
                             onClick={() => {
                               setRemovedLineItemIds((prev) => {
                                 const next = new Set(prev);
@@ -2647,7 +2775,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               <Autocomplete
                 options={draftOrderSuggestions}
                 loading={isDraftOrderSearching}
-                getOptionLabel={(o: any) => o.name || o.id?.split("/").pop() || ""}
+                getOptionLabel={(o: any) =>
+                  o.name || o.id?.split("/").pop() || ""
+                }
                 isOptionEqualToValue={(o: any, v: any) => o.id === v.id}
                 filterOptions={(x) => x}
                 value={draftSelectedOrder}
@@ -2655,7 +2785,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 onInputChange={(_, val, reason) => {
                   if (reason === "input") {
                     setDraftSearchInput(val);
-                    if (draftSearchDebounceRef.current) clearTimeout(draftSearchDebounceRef.current);
+                    if (draftSearchDebounceRef.current)
+                      clearTimeout(draftSearchDebounceRef.current);
                     draftSearchDebounceRef.current = setTimeout(() => {
                       setDraftSearchFilter(buildShopifyQuery(val));
                     }, 400);
@@ -2677,19 +2808,42 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   const { key, ...liProps } = props as any;
                   const numericId = option.id?.split("/").pop() || "";
                   return (
-                    <li key={key} {...liProps} style={{ padding: "6px 12px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "nowrap", overflow: "hidden" }}>
-                        <span style={{ fontWeight: 600, color: "#4f46e5", fontSize: "12px", whiteSpace: "nowrap" }}>{option.name}</span>
-                        <span style={{ color: "#9ca3af", fontSize: "11px", whiteSpace: "nowrap" }}>#{numericId}</span>
-                        {option.email && (
-                          <span style={{ color: "#6b7280", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{option.email}</span>
-                        )}
-                        {option.shippingAddress?.firstName && (
-                          <span style={{ color: "#9ca3af", fontSize: "11px", whiteSpace: "nowrap", marginLeft: "auto" }}>
-                            {option.shippingAddress.firstName} {option.shippingAddress.lastName}
-                          </span>
-                        )}
-                      </div>
+                    <li key={key} {...liProps}>
+                      <span style={{ fontWeight: 600, color: "#4f46e5" }}>
+                        {option.name}
+                      </span>
+                      <span
+                        style={{
+                          marginLeft: "8px",
+                          color: "#9ca3af",
+                          fontSize: "12px",
+                        }}
+                      >
+                        #{numericId}
+                      </span>
+                      {option.email && (
+                        <span
+                          style={{
+                            marginLeft: "10px",
+                            color: "#6b7280",
+                            fontSize: "12px",
+                          }}
+                        >
+                          {option.email}
+                        </span>
+                      )}
+                      {option.shippingAddress?.firstName && (
+                        <span
+                          style={{
+                            marginLeft: "10px",
+                            color: "#9ca3af",
+                            fontSize: "12px",
+                          }}
+                        >
+                          {option.shippingAddress.firstName}{" "}
+                          {option.shippingAddress.lastName}
+                        </span>
+                      )}
                     </li>
                   );
                 }}
@@ -2702,7 +2856,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                       "& .MuiOutlinedInput-root": {
                         borderRadius: "8px",
                         fontSize: "14px",
-                        "& fieldset": { borderColor: editDraftOrderId ? "#6366f1" : "#e5e7eb" },
+                        "& fieldset": {
+                          borderColor: editDraftOrderId ? "#6366f1" : "#e5e7eb",
+                        },
                       },
                     }}
                     slotProps={{
@@ -2710,7 +2866,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                         ...params.InputProps,
                         endAdornment: (
                           <>
-                            {isDraftOrderSearching && <CircularProgress color="inherit" size={14} />}
+                            {isDraftOrderSearching && (
+                              <CircularProgress color="inherit" size={14} />
+                            )}
                             {params.InputProps.endAdornment}
                           </>
                         ),
@@ -2719,7 +2877,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   />
                 )}
               />
-              <span style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}>
+              <span
+                style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}
+              >
                 Type draft order # (e.g. D1) or email to search
               </span>
             </div>
