@@ -1350,7 +1350,10 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                   </IconButton>
                 </Tooltip>
 
-                {(userId === "kav1" || userId === "mdb1") && (
+                {(userId === "kav1" ||
+                  userId === "mdb1" ||
+                  userId === "mdb20" ||
+                  userId === "mdb15") && (
                   <Button
                     variant="contained"
                     startIcon={<Add />}
@@ -1636,7 +1639,10 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                 </Box>
               </Popover>
 
-              {(userId === "kav1" || userId === "mdb1") && (
+              {(userId === "kav1" ||
+                userId === "mdb1" ||
+                userId === "mdb20" ||
+                userId === "mdb15") && (
                 <>
                   <Dialog
                     open={openCreateOrder}

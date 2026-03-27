@@ -113,30 +113,32 @@ const STORE_OPTIONS: {
   tag: string;
   handle: string;
 }[] = [
-  { value: "store1", label: "Testing", tag: "Testing", handle: "testoneabc" },
+  // { value: "store1", label: "Testing", tag: "Testing", handle: "testoneabc" },
+  { value: "store1", label: "MDB CO", tag: "Testing", handle: "mdbco-test" },
+
   {
     value: "store1",
     label: "CP02 -mdbco",
     tag: "CP02 -mdbco",
-    handle: "testoneabc",
+    handle: "mdbco-test",
   },
   {
     value: "store1",
     label: "CP03 -mdbco",
     tag: "CP03 -mdbco",
-    handle: "testoneabc",
+    handle: "mdbco-test",
   },
   {
     value: "store1",
     label: "CP05 -mdbco",
     tag: "CP05 -mdbco",
-    handle: "testoneabc",
+    handle: "mdbco-test",
   },
   {
     value: "store1",
     label: "CP010 -mdbco",
     tag: "CP010 -mdbco",
-    handle: "testoneabc",
+    handle: "mdbco-test",
   },
   {
     value: "store2",
@@ -681,6 +683,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleSelectEditOrder = (order: any, isDraft = false) => {
     const numericId = order.id?.split("/").pop() || "";
+    setOperations([newOperation()]);
+    setRemovedLineItemIds(new Set());
+    resetEditOrder();
     if (isDraft) {
       setEditDraftOrderId(numericId);
     } else {
@@ -770,7 +775,12 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   ] = useUpdateDraftOrderMutation();
   const [
     editOrderMutation,
-    { isLoading: isEditing, data: editData, error: editError },
+    {
+      isLoading: isEditing,
+      data: editData,
+      error: editError,
+      reset: resetEditOrder,
+    },
   ] = useEditOrderMutation();
 
   // Load existing line items for the order being edited
@@ -907,6 +917,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     setDraftVariantItems([]);
     setDraftCustomItems([]);
     setDraftNewItems([]);
+    resetEditOrder();
   }, [mode]); // Reset all form state when store changes
   useEffect(() => {
     // Create mode
@@ -942,6 +953,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     setDraftVariantItems([]);
     setDraftCustomItems([]);
     setDraftNewItems([]);
+    resetEditOrder();
   }, [selectedStoreOption]);
 
   // ── Create mode: handlers ─────────────────────────────────────────────────
@@ -1114,7 +1126,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleUpdateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editOrderId.trim()) { toast.error("Please enter an Order ID"); return; }
+    if (!editOrderId.trim()) {
+      toast.error("Please enter an Order ID");
+      return;
+    }
     try {
       await updateOrder({
         orderId: editOrderId.trim(),
@@ -1129,7 +1144,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleUpdateDraft = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editDraftOrderId.trim()) { toast.error("Please enter a Draft Order ID"); return; }
+    if (!editDraftOrderId.trim()) {
+      toast.error("Please enter a Draft Order ID");
+      return;
+    }
     try {
       await updateDraftOrder({
         draftOrderId: editDraftOrderId.trim(),
@@ -1144,7 +1162,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleUpdateDraftLineItems = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editDraftOrderId.trim()) { toast.error("Please select a draft order first."); return; }
+    if (!editDraftOrderId.trim()) {
+      toast.error("Please select a draft order first.");
+      return;
+    }
 
     // Build the merged line items payload:
     // - Existing variant items (qty=0 tells backend to remove)
@@ -1160,7 +1181,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         .map((li) => ({ variantId: li.variantId, quantity: li.quantity })),
     ];
 
-    if (lineItems.length === 0) { toast.error("No line item changes to save."); return; }
+    if (lineItems.length === 0) {
+      toast.error("No line item changes to save.");
+      return;
+    }
 
     const result = await updateDraftOrder({
       draftOrderId: editDraftOrderId.trim(),
@@ -1193,7 +1217,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleEditLineItems = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editOrderId.trim()) { toast.error("Please enter an Order ID"); return; }
+    if (!editOrderId.trim()) {
+      toast.error("Please enter an Order ID");
+      return;
+    }
     const filledOperations = operations.filter((op) => {
       if (op.type === "addVariant") return op.variantId.trim() !== "";
       if (op.type === "setQuantity") return op.lineItemId.trim() !== "";
@@ -1235,7 +1262,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       quantity: 0,
     }));
     const allOps = [...ops, ...removalOps];
-    if (allOps.length === 0) { toast.error("No operations to apply."); return; }
+    if (allOps.length === 0) {
+      toast.error("No operations to apply.");
+      return;
+    }
     try {
       await editOrderMutation({
         orderId: editOrderId.trim(),
@@ -1245,6 +1275,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         staffNote: staffNote.trim() || undefined,
       }).unwrap();
       setRemovedLineItemIds(new Set());
+      setOperations([newOperation()]);
       refetchLineItems();
       toast.success("Order edited successfully!");
     } catch (err) {
@@ -2073,6 +2104,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     setEditAddr({ ...defaultAddress });
                     setRemovedLineItemIds(new Set());
                     setOperations([newOperation()]);
+                    resetEditOrder();
                   }
                 }}
                 renderOption={(props, option: any) => {
