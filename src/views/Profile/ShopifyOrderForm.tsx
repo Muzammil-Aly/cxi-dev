@@ -114,31 +114,31 @@ const STORE_OPTIONS: {
   handle: string;
 }[] = [
   // { value: "store1", label: "Testing", tag: "Testing", handle: "testoneabc" },
-  { value: "store1", label: "MDB CO", tag: "Testing", handle: "testoneabc" },
+  { value: "store1", label: "MDB CO", tag: "Testing", handle: "mdbco-test" },
 
   {
     value: "store1",
     label: "CP02 -mdbco",
     tag: "CP02 -mdbco",
-    handle: "testoneabc",
+    handle: "mdbco-test",
   },
   {
     value: "store1",
     label: "CP03 -mdbco",
     tag: "CP03 -mdbco",
-    handle: "testoneabc",
+    handle: "mdbco-test",
   },
   {
     value: "store1",
     label: "CP05 -mdbco",
     tag: "CP05 -mdbco",
-    handle: "testoneabc",
+    handle: "mdbco-test",
   },
   {
     value: "store1",
     label: "CP010 -mdbco",
     tag: "CP010 -mdbco",
-    handle: "testoneabc",
+    handle: "mdbco-test",
   },
   {
     value: "store2",
