@@ -67,6 +67,9 @@ import FilterAltIcon from "@mui/icons-material/FilterAlt";
 import CircularLoader from "@/components/Common/CustomSearch/CircularLoader";
 import AddIcon from "@mui/icons-material/Add";
 import ShopifyOrderForm from "./ShopifyOrderForm";
+import { exportToExcel } from "@/utils/exportToExcel";
+import DownloadIcon from "@mui/icons-material/Download";
+
 const Orders = ({ customerId }: { customerId?: string }) => {
   // Use column preferences hook
   const {
@@ -1350,7 +1353,10 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                   </IconButton>
                 </Tooltip>
 
-                {(userId === "kav1" || userId === "mdb1") && (
+                {(userId === "kav1" ||
+                  userId === "mdb1" ||
+                  userId === "mdb20" ||
+                  userId === "mdb15") && (
                   <Button
                     variant="contained"
                     startIcon={<Add />}
@@ -1636,7 +1642,10 @@ const Orders = ({ customerId }: { customerId?: string }) => {
                 </Box>
               </Popover>
 
-              {(userId === "kav1" || userId === "mdb1") && (
+              {(userId === "kav1" ||
+                userId === "mdb1" ||
+                userId === "mdb20" ||
+                userId === "mdb15") && (
                 <>
                   <Dialog
                     open={openCreateOrder}
