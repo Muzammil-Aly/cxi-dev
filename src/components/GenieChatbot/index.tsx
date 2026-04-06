@@ -56,11 +56,14 @@ function extractGenieResponse(data: any): {
       suggestions.push(...attachment.suggested_questions.questions);
     }
   }
+  const rawContent =
+    parts.join("\n\n") || "Received a response but there was no text content.";
+
+  const cleanedContent = rawContent.replace(/\*\*/g, "");
 
   return {
     content:
-      parts.join("\n\n") ||
-      "Received a response but there was no text content.",
+      cleanedContent || "Received a response but there was no text content.",
     suggestions,
   };
 }
@@ -99,9 +102,13 @@ function parseDbxMessages(raw: any): Message[] {
     }
 
     if (parts.length > 0 || suggestions.length > 0) {
+      const rawContent = parts.join("\n\n");
+
+      const cleanedContent = rawContent.replace(/\*\*/g, "");
+
       result.push({
         role: "assistant",
-        content: parts.join("\n\n"),
+        content: cleanedContent,
         suggestions,
       });
     }
