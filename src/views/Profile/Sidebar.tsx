@@ -229,7 +229,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       ))}
 
       {/* Genie AI Toggle */}
-      <Box
+      {/* <Box
         onClick={onGenieToggle}
         sx={{
           display: "flex",
@@ -248,7 +248,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       >
         <AutoAwesomeIcon sx={{ fontSize: 20 }} />
         Genie AI
-      </Box>
+      </Box> */}
 
       {/* User Box */}
       <Box
