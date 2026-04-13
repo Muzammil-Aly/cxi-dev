@@ -9,6 +9,17 @@ import {
   Tooltip,
   Divider,
   Chip,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
@@ -17,17 +28,33 @@ import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import HistoryIcon from "@mui/icons-material/History";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import ThumbUpOutlinedIcon from "@mui/icons-material/ThumbUpOutlined";
+import ThumbDownOutlinedIcon from "@mui/icons-material/ThumbDownOutlined";
+import ThumbUpIcon from "@mui/icons-material/ThumbUp";
+import ThumbDownIcon from "@mui/icons-material/ThumbDown";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import {
   useStartConversationMutation,
   useSendMessageMutation,
   useGetMyConversationsQuery,
   useLazyGetConversationMessagesQuery,
+  useSubmitFeedbackMutation,
+  useDeleteMessageMutation,
+  useDeleteConversationMutation,
 } from "@/redux/services/genieApi";
+
+interface TableData {
+  columns: string[];
+  rows: string[][];
+}
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  id?: string;
+  rating?: "POSITIVE" | "NEGATIVE" | "NONE";
   suggestions?: string[];
+  tableData?: TableData | null;
 }
 
 interface GenieChatbotProps {
@@ -38,16 +65,36 @@ interface GenieChatbotProps {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+function extractTableData(attachment: any): TableData | null {
+  const sr = attachment?.query_result?.statement_response;
+  if (!sr) return null;
+  const columns: string[] =
+    sr.manifest?.schema?.columns?.map((c: any) => c.name) ?? [];
+  const rows: string[][] = sr.result?.data_array ?? [];
+  if (columns.length === 0 || rows.length === 0) return null;
+  return { columns, rows };
+}
+
 function extractGenieResponse(data: any): {
   content: string;
   suggestions: string[];
+  tableData: TableData | null;
+  messageId: string | null;
 } {
   const result = data?.message_result;
-  if (!result) return { content: "No response received.", suggestions: [] };
+  const messageId = data?.message_id ?? null;
+  if (!result)
+    return {
+      content: "No response received.",
+      suggestions: [],
+      tableData: null,
+      messageId,
+    };
 
   const attachments: any[] = result.attachments ?? [];
   const parts: string[] = [];
   const suggestions: string[] = [];
+  let tableData: TableData | null = null;
 
   for (const attachment of attachments) {
     if (attachment.text?.content) parts.push(attachment.text.content);
@@ -55,6 +102,7 @@ function extractGenieResponse(data: any): {
     if (Array.isArray(attachment.suggested_questions?.questions)) {
       suggestions.push(...attachment.suggested_questions.questions);
     }
+    if (!tableData) tableData = extractTableData(attachment);
   }
   const rawContent =
     parts.join("\n\n") || "Received a response but there was no text content.";
@@ -65,6 +113,8 @@ function extractGenieResponse(data: any): {
     content:
       cleanedContent || "Received a response but there was no text content.",
     suggestions,
+    tableData,
+    messageId,
   };
 }
 
@@ -88,10 +138,11 @@ function parseDbxMessages(raw: any): Message[] {
       result.push({ role: "user", content: m.content });
     }
 
-    // assistant turn — pull text + suggestions from attachments
+    // assistant turn — pull text + suggestions + table from attachments
     const attachments: any[] = m.attachments ?? [];
     const parts: string[] = [];
     const suggestions: string[] = [];
+    let tableData: TableData | null = null;
 
     for (const att of attachments) {
       if (att.text?.content) parts.push(att.text.content);
@@ -99,17 +150,21 @@ function parseDbxMessages(raw: any): Message[] {
       if (Array.isArray(att.suggested_questions?.questions)) {
         suggestions.push(...att.suggested_questions.questions);
       }
+      if (!tableData) tableData = extractTableData(att);
     }
 
-    if (parts.length > 0 || suggestions.length > 0) {
+    if (parts.length > 0 || suggestions.length > 0 || tableData) {
       const rawContent = parts.join("\n\n");
 
       const cleanedContent = rawContent.replace(/\*\*/g, "");
 
       result.push({
         role: "assistant",
+        id: m.message_id,
+        rating: m.feedback?.rating ?? "NONE",
         content: cleanedContent,
         suggestions,
+        tableData,
       });
     }
   }
@@ -137,12 +192,22 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
   const [input, setInput] = useState("");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [feedback, setFeedback] = useState<
+    Record<string, "POSITIVE" | "NEGATIVE">
+  >({});
+  const [deletedConvIds, setDeletedConvIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteConvId, setConfirmDeleteConvId] = useState<string | null>(
+    null,
+  );
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [startConversation, { isLoading: isStarting }] =
     useStartConversationMutation();
   const [sendMessage, { isLoading: isSending }] = useSendMessageMutation();
   const [fetchMessages] = useLazyGetConversationMessagesQuery();
+  const [submitFeedback] = useSubmitFeedbackMutation();
+  const [deleteMessage] = useDeleteMessageMutation();
+  const [deleteConversation] = useDeleteConversationMutation();
 
   const {
     data: historyData,
@@ -174,10 +239,21 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
         data = await sendMessage({ conversationId, content }).unwrap();
       }
 
-      const { content: reply, suggestions } = extractGenieResponse(data);
+      const {
+        content: reply,
+        suggestions,
+        tableData,
+        messageId,
+      } = extractGenieResponse(data);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: reply, suggestions },
+        {
+          role: "assistant",
+          id: messageId ?? undefined,
+          content: reply,
+          suggestions,
+          tableData,
+        },
       ]);
     } catch {
       setMessages((prev) => [
@@ -202,6 +278,7 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
     setMessages([]);
     setConversationId(null);
     setInput("");
+    setFeedback({});
     setView("chat");
   };
 
@@ -215,9 +292,18 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
     setView("chat");
     setConversationId(convId);
     setMessages([]);
+    setFeedback({});
     try {
       const raw = await fetchMessages(convId).unwrap();
-      setMessages(parseDbxMessages(raw));
+      const parsed = parseDbxMessages(raw);
+      setMessages(parsed);
+      const seeded: Record<string, "POSITIVE" | "NEGATIVE"> = {};
+      for (const msg of parsed) {
+        if (msg.id && msg.rating && msg.rating !== "NONE") {
+          seeded[msg.id] = msg.rating;
+        }
+      }
+      setFeedback(seeded);
     } catch {
       setMessages([
         {
@@ -232,9 +318,78 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
     }
   };
 
+  const handleFeedback = async (
+    msgId: string,
+    rating: "POSITIVE" | "NEGATIVE",
+  ) => {
+    if (!conversationId) return;
+    // toggle off if same rating clicked again
+    if (feedback[msgId] === rating) {
+      setFeedback((prev) => {
+        const next = { ...prev };
+        delete next[msgId];
+        return next;
+      });
+      return;
+    }
+    setFeedback((prev) => ({ ...prev, [msgId]: rating }));
+    try {
+      await submitFeedback({
+        conversationId,
+        messageId: msgId,
+        rating,
+      }).unwrap();
+    } catch {
+      // revert on failure
+      setFeedback((prev) => {
+        const next = { ...prev };
+        delete next[msgId];
+        return next;
+      });
+    }
+  };
+
+  const handleDeleteMessage = async (msgIndex: number, msgId: string) => {
+    if (!conversationId) return;
+    // optimistically remove both the assistant message and the preceding user message
+    setMessages((prev) => {
+      const next = [...prev];
+      next.splice(msgIndex - 1, 2); // remove user + assistant pair
+      return next;
+    });
+    try {
+      await deleteMessage({ conversationId, messageId: msgId }).unwrap();
+    } catch {
+      // silently ignore — message already removed from UI
+    }
+  };
+
+  const handleDeleteConversation = async () => {
+    const convId = confirmDeleteConvId;
+    if (!convId) return;
+    setConfirmDeleteConvId(null);
+    setDeletedConvIds((prev) => new Set([...prev, convId]));
+    if (conversationId === convId) {
+      setMessages([]);
+      setConversationId(null);
+      setFeedback({});
+    }
+    try {
+      await deleteConversation(convId).unwrap();
+    } catch {
+      setDeletedConvIds((prev) => {
+        const next = new Set(prev);
+        next.delete(convId);
+        return next;
+      });
+    }
+  };
+
   if (!open) return null;
 
-  const conversations = historyData?.conversations ?? [];
+  const conversations = (historyData?.conversations ?? []).filter(
+    (c) => !deletedConvIds.has(c.conversation_id),
+  );
 
   return (
     <Box
@@ -352,13 +507,9 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
               {conversations.map((conv, idx) => (
                 <React.Fragment key={conv.conversation_id}>
                   <Box
-                    onClick={() =>
-                      handleSelectConversation(conv.conversation_id)
-                    }
                     sx={{
                       px: 2,
                       py: 1.5,
-                      cursor: "pointer",
                       display: "flex",
                       alignItems: "flex-start",
                       gap: 1.5,
@@ -367,6 +518,7 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
                           ? "#EEF0FA"
                           : "transparent",
                       "&:hover": { bgcolor: "#F4F6FB" },
+                      "&:hover .delete-conv-btn": { opacity: 1 },
                     }}
                   >
                     <ChatBubbleOutlineIcon
@@ -377,7 +529,12 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
                         flexShrink: 0,
                       }}
                     />
-                    <Box sx={{ minWidth: 0 }}>
+                    <Box
+                      sx={{ minWidth: 0, flexGrow: 1, cursor: "pointer" }}
+                      onClick={() =>
+                        handleSelectConversation(conv.conversation_id)
+                      }
+                    >
                       <Typography
                         sx={{
                           fontSize: 13,
@@ -399,6 +556,25 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
                         </Typography>
                       )}
                     </Box>
+                    <Tooltip title="Delete conversation">
+                      <IconButton
+                        className="delete-conv-btn"
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteConvId(conv.conversation_id);
+                        }}
+                        sx={{
+                          opacity: 0,
+                          transition: "opacity 0.15s",
+                          color: "#aaa",
+                          flexShrink: 0,
+                          "&:hover": { color: "#d32f2f" },
+                        }}
+                      >
+                        <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Tooltip>
                   </Box>
                   {idx < conversations.length - 1 && (
                     <Divider sx={{ mx: 2, borderColor: "#F0F0F0" }} />
@@ -458,8 +634,20 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
 
             {/* Loading previous conversation */}
             {loadingHistory && (
-              <Box sx={{ display: "flex", justifyContent: "center", mt: 4 }}>
-                <CircularProgress size={24} sx={{ color: "#131C55" }} />
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  gap: 1.5,
+                }}
+              >
+                <CircularProgress size={28} sx={{ color: "#131C55" }} />
+                <Typography sx={{ fontSize: 13, color: "#888" }}>
+                  Loading conversation…
+                </Typography>
               </Box>
             )}
 
@@ -500,8 +688,140 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
                           {msg.content}
                         </Typography>
                       )}
+                      {msg.tableData && (
+                        <Box
+                          sx={{
+                            mt: 1.5,
+                            overflowX: "auto",
+                            borderRadius: "8px",
+                            border: "1px solid #E0E4F0",
+                            "&::-webkit-scrollbar": { height: 4 },
+                            "&::-webkit-scrollbar-thumb": {
+                              bgcolor: "#C8CDF0",
+                              borderRadius: 2,
+                            },
+                          }}
+                        >
+                          <Table size="small" sx={{ minWidth: "max-content" }}>
+                            <TableHead>
+                              <TableRow sx={{ bgcolor: "#EEF0FA" }}>
+                                {msg.tableData.columns.map((col) => (
+                                  <TableCell
+                                    key={col}
+                                    sx={{
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      color: "#131C55",
+                                      py: 0.75,
+                                      px: 1,
+                                      borderBottom: "1px solid #C8CDF0",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {col}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {msg.tableData.rows.map((row, ri) => (
+                                <TableRow
+                                  key={ri}
+                                  sx={{
+                                    "&:last-child td": { border: 0 },
+                                    "&:hover": { bgcolor: "#F4F6FB" },
+                                  }}
+                                >
+                                  {row.map((cell, ci) => (
+                                    <TableCell
+                                      key={ci}
+                                      sx={{
+                                        fontSize: 11,
+                                        py: 0.5,
+                                        px: 1,
+                                        color: "#0D0D12",
+                                        whiteSpace: "nowrap",
+                                        borderBottom: "1px solid #F0F0F0",
+                                      }}
+                                    >
+                                      {cell}
+                                    </TableCell>
+                                  ))}
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </Box>
+                      )}
                     </Box>
                   </Box>
+
+                  {/* Feedback + delete row — only on assistant messages with an ID */}
+                  {msg.role === "assistant" && msg.id && (
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.25,
+                        mt: 0.25,
+                        pl: 0.5,
+                      }}
+                    >
+                      <Tooltip title="Helpful">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleFeedback(msg.id!, "POSITIVE")}
+                          sx={{
+                            p: 0.5,
+                            color:
+                              feedback[msg.id] === "POSITIVE"
+                                ? "#131C55"
+                                : "#C0C4D6",
+                            "&:hover": { color: "#131C55" },
+                          }}
+                        >
+                          {feedback[msg.id] === "POSITIVE" ? (
+                            <ThumbUpIcon sx={{ fontSize: 14 }} />
+                          ) : (
+                            <ThumbUpOutlinedIcon sx={{ fontSize: 14 }} />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Not helpful">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleFeedback(msg.id!, "NEGATIVE")}
+                          sx={{
+                            p: 0.5,
+                            color:
+                              feedback[msg.id] === "NEGATIVE"
+                                ? "#d32f2f"
+                                : "#C0C4D6",
+                            "&:hover": { color: "#d32f2f" },
+                          }}
+                        >
+                          {feedback[msg.id] === "NEGATIVE" ? (
+                            <ThumbDownIcon sx={{ fontSize: 14 }} />
+                          ) : (
+                            <ThumbDownOutlinedIcon sx={{ fontSize: 14 }} />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete message">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteMessage(idx, msg.id!)}
+                          sx={{
+                            p: 0.5,
+                            color: "#C0C4D6",
+                            "&:hover": { color: "#d32f2f" },
+                          }}
+                        >
+                          <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  )}
 
                   {/* Suggested questions — only on the last assistant message */}
                   {msg.role === "assistant" &&
@@ -647,6 +967,57 @@ const GenieChatbot: React.FC<GenieChatbotProps> = ({
           </Box>
         </>
       )}
+
+      {/* ── Delete Confirmation Dialog ── */}
+      <Dialog
+        open={!!confirmDeleteConvId}
+        onClose={() => setConfirmDeleteConvId(null)}
+        PaperProps={{ sx: { borderRadius: 2, minWidth: 280 } }}
+      >
+        <DialogTitle sx={{ fontSize: 15, fontWeight: 700, pb: 1 }}>
+          Delete conversation?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText sx={{ fontSize: 13, color: "#555" }}>
+            This conversation will be permanently deleted and cannot be
+            recovered.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, pb: 2, gap: 1 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => setConfirmDeleteConvId(null)}
+            sx={{
+              color: "#555",
+              borderColor: "#ccc",
+              textTransform: "none",
+              fontSize: 13,
+              minWidth: 80,
+              "&:hover": {
+                borderColor: "#999",
+                bgcolor: "#f5f5f5",
+                color: "#555",
+              },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={handleDeleteConversation}
+            sx={{
+              bgcolor: "#d32f2f",
+              textTransform: "none",
+              fontSize: 13,
+              "&:hover": { bgcolor: "#b71c1c" },
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

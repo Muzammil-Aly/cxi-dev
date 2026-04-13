@@ -32,6 +32,31 @@ export const genieApi = createApi({
       query: (conversationId) =>
         `/genie/conversations/${conversationId}/messages`,
     }),
+    submitFeedback: builder.mutation<
+      any,
+      { conversationId: string; messageId: string; rating: "POSITIVE" | "NEGATIVE"; comment?: string }
+    >({
+      query: ({ conversationId, messageId, rating, comment }) => ({
+        url: `/genie/conversations/${conversationId}/messages/${messageId}/feedback`,
+        method: "POST",
+        body: comment ? { rating, comment } : { rating },
+      }),
+    }),
+    deleteMessage: builder.mutation<
+      any,
+      { conversationId: string; messageId: string }
+    >({
+      query: ({ conversationId, messageId }) => ({
+        url: `/genie/conversations/${conversationId}/messages/${messageId}`,
+        method: "DELETE",
+      }),
+    }),
+    deleteConversation: builder.mutation<any, string>({
+      query: (conversationId) => ({
+        url: `/genie/conversations/${conversationId}`,
+        method: "DELETE",
+      }),
+    }),
   }),
 });
 
@@ -40,4 +65,7 @@ export const {
   useSendMessageMutation,
   useGetMyConversationsQuery,
   useLazyGetConversationMessagesQuery,
+  useSubmitFeedbackMutation,
+  useDeleteMessageMutation,
+  useDeleteConversationMutation,
 } = genieApi;
