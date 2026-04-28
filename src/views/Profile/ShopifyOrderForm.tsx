@@ -1561,16 +1561,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     resetEditOrder();
   }, [mode]); // Reset all form state when store changes
   useEffect(() => {
-    // Create mode
-    setForm({
-      email: "",
-      lineItems: [{ variantId: "", quantity: 1 }],
-      shippingAddress: { ...defaultAddress },
-      billingAddress: { ...defaultAddress },
-    });
-    setLineItemProductIds([null]);
-    setOrderSearchInput("");
-    setOrderSearchFilter(undefined);
+    // Reset line items for the new store, keep email/addresses and available items
+    setForm((prev) => ({ ...prev, lineItems: [] }));
+    setLineItemProductIds([]);
     // Edit mode
     setEditOrderId("");
     setEditDraftOrderId("");
