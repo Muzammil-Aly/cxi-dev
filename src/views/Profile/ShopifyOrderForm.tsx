@@ -2262,7 +2262,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               { key: "create", label: "Create Order" },
               { key: "editOrder", label: "Edit Order" },
               { key: "editDraft", label: "Edit Draft" },
-              { key: "createProduct", label: "Create Product" },
+              // { key: "createProduct", label: "Create Product" },
             ] as { key: FormMode; label: string }[]
           ).map(({ key, label }) => (
             <button
