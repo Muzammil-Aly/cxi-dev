@@ -57,15 +57,16 @@ export interface ShopifyOrder {
 export const shopifyApi = createApi({
   reducerPath: "shopifyApi",
   baseQuery: baseQueryWithReauth,
-  tagTypes: ["DraftOrder"],
+  tagTypes: ["DraftOrder", "Product"],
   endpoints: (builder) => ({
     getProducts: builder.query<ShopifyProduct[], ShopifyStore>({
       query: (store = "store1") => ({
-        url: `/shopify/products?store=${store}`,
+        url: `/shopify/products?store=${store}&limit=250`,
         method: "GET",
       }),
       transformResponse: (response: { data: ShopifyProduct[] }) =>
         response.data,
+      providesTags: (result, error, store) => [{ type: "Product", id: store }],
     }),
     createOrder: builder.mutation<
       any,
@@ -75,7 +76,15 @@ export const shopifyApi = createApi({
         financialStatus?: string;
         note?: string;
         tags?: string[];
-        lineItems: { variantId: string; quantity: number }[];
+        lineItems: {
+          variantId?: string;
+          quantity: number;
+          title?: string;
+          price?: string;
+          sku?: string;
+          vendor?: string;
+          properties?: { name: string; value: string }[];
+        }[];
         shippingAddress: {
           firstName: string;
           lastName: string;
@@ -129,7 +138,15 @@ export const shopifyApi = createApi({
         email: string;
         note?: string;
         tags?: string[];
-        lineItems: { variantId: string; quantity: number }[];
+        lineItems: {
+          variantId?: string;
+          quantity: number;
+          title?: string;
+          price?: string;
+          sku?: string;
+          vendor?: string;
+          properties?: { name: string; value: string }[];
+        }[];
         shippingAddress: {
           firstName: string;
           lastName: string;
@@ -412,6 +429,64 @@ export const shopifyApi = createApi({
       },
       providesTags: [{ type: "DraftOrder", id: "LIST" }],
     }),
+
+    getShopifyReturnReasons: builder.query<
+      { data: { Code: string; Description: string }[]; total_records: number },
+      void
+    >({
+      query: () => ({ url: `/shopify_return_reasons?page_size=100`, method: "GET" }),
+    }),
+
+    createProduct: builder.mutation<
+      any,
+      {
+        store?: ShopifyStore;
+        title: string;
+        price: number;
+        sku?: string;
+        product_type?: string;
+        vendor?: string;
+      }
+    >({
+      query: ({ store = "store1", title, price, sku, product_type, vendor }) => ({
+        url: `/shopify/create-product?store=${store}`,
+        method: "POST",
+        body: { title, price, sku, product_type, vendor },
+      }),
+      invalidatesTags: (result, error, { store = "store1" }) => [
+        { type: "Product", id: store },
+      ],
+    }),
+
+    getShopifyLineItems: builder.query<
+      {
+        data: {
+          order_id: string;
+          customer_email: string;
+          phone_no: string;
+          lot_no: string | null;
+          item_no: string;
+          quantity: number;
+          zip_code: string;
+          address: string;
+          state_code: string;
+          country_code: string;
+          company: string;
+          unit_price: number | null;
+          description?: string | null;
+          description_2?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
+        }[];
+        total_records: number;
+      },
+      { order_id: string }
+    >({
+      query: ({ order_id }) => ({
+        url: `/shopify_line_items?order_id=${encodeURIComponent(order_id)}&page_size=50`,
+        method: "GET",
+      }),
+    }),
   }),
 });
 
@@ -426,4 +501,7 @@ export const {
   useEditOrderMutation,
   useGetShopifyOrdersQuery,
   useGetShopifyDraftOrdersQuery,
+  useGetShopifyReturnReasonsQuery,
+  useGetShopifyLineItemsQuery,
+  useCreateProductMutation,
 } = shopifyApi;

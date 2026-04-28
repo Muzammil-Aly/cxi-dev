@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import {
   useCreateOrderMutation,
   useCreateDraftOrderMutation,
+  useCreateProductMutation,
   useUpdateOrderMutation,
   useUpdateDraftOrderMutation,
   useEditOrderMutation,
@@ -12,11 +13,13 @@ import {
   useGetProductsQuery,
   useGetShopifyOrdersQuery,
   useGetShopifyDraftOrdersQuery,
+  useGetShopifyReturnReasonsQuery,
   type ProductVariant,
   type ShopifyProduct,
   type ShopifyStore,
 } from "../../redux/services/shopifyApi";
-import { useGetCustomerOrdersQuery } from "../../redux/services/profileApi";
+import { useGetShopifyLineItemsQuery } from "../../redux/services/shopifyApi";
+import { useGetTouchupsQuery } from "../../redux/services/InventoryApi";
 import { Autocomplete, CircularProgress, TextField } from "@mui/material";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -44,6 +47,22 @@ interface Address {
 interface LineItem {
   variantId: string;
   quantity: number;
+  item_no?: string;
+  lot_no?: string | null;
+  unit_price?: number | null;
+  description?: string | null;
+  return_reason_code?: string;
+  parts?: Array<{
+    parts_item_no: string;
+    parts_qty: number;
+    parts_unit_price: number | null;
+  }>;
+  isCustomProduct?: boolean;
+  customTitle?: string;
+  customPrice?: string;
+  customSku?: string;
+  customProductType?: string;
+  customVendor?: string;
 }
 
 interface OrderFormState {
@@ -58,7 +77,7 @@ interface CustomAttribute {
   value: string;
 }
 
-type FormMode = "create" | "editOrder" | "editDraft";
+type FormMode = "create" | "editOrder" | "editDraft" | "createProduct";
 type EditSubTab = "details" | "lineItems";
 type DraftSubTab = "details" | "lineItems";
 type OpType = "addVariant" | "setQuantity" | "addDiscount";
@@ -403,7 +422,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
             const isSelected = opt.value === value;
             return (
               <div
-                key={opt.value}
+                key={opt.label}
                 onClick={() => {
                   onChange(opt.value);
                   setOpen(false);
@@ -449,6 +468,593 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── SearchableDropdown ───────────────────────────────────────────────────────
+
+interface SearchableDropdownProps {
+  value: string;
+  onChange: (value: string) => void;
+  options: CustomDropdownOption[];
+  placeholder?: string;
+}
+
+const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
+  value,
+  onChange,
+  options,
+  placeholder,
+}) => {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [open]);
+
+  const selected = options.find((o) => o.value === value);
+  const filtered = search
+    ? options.filter(
+        (o) =>
+          o.label.toLowerCase().includes(search.toLowerCase()) ||
+          o.value.toLowerCase().includes(search.toLowerCase()),
+      )
+    : options.slice(0, 5);
+
+  return (
+    <div ref={ref} style={{ position: "relative", userSelect: "none" }}>
+      <div
+        onClick={() => setOpen((p) => !p)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 14px",
+          borderWidth: "1.5px",
+          borderStyle: "solid",
+          borderColor: open ? "#6366f1" : "#e5e7eb",
+          borderRadius: "8px",
+          fontSize: "14px",
+          cursor: "pointer",
+          background: "#fff",
+          color: selected ? "#111827" : "#9ca3af",
+          transition: "border-color 0.15s",
+        }}
+      >
+        <span>{selected?.label ?? placeholder ?? "— select —"}</span>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#6b7280"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.2s",
+          }}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            top: "calc(100% + 6px)",
+            left: 0,
+            right: 0,
+            background: "#fff",
+            border: "1.5px solid #e5e7eb",
+            borderRadius: "12px",
+            boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
+            zIndex: 999,
+            padding: "6px",
+          }}
+        >
+          <div style={{ padding: "4px 6px 6px" }}>
+            <input
+              ref={inputRef}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..."
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                padding: "7px 10px",
+                border: "1.5px solid #e5e7eb",
+                borderRadius: "6px",
+                fontSize: "13px",
+                outline: "none",
+                boxSizing: "border-box",
+                color: "#111827",
+              }}
+            />
+          </div>
+          <div style={{ maxHeight: "220px", overflowY: "auto" }}>
+            {filtered.length === 0 ? (
+              <div
+                style={{
+                  padding: "10px 14px",
+                  fontSize: "13px",
+                  color: "#9ca3af",
+                }}
+              >
+                No results
+              </div>
+            ) : (
+              filtered.map((opt) => {
+                const isSelected = opt.value === value;
+                return (
+                  <div
+                    key={opt.label}
+                    onClick={() => {
+                      onChange(opt.value);
+                      setOpen(false);
+                      setSearch("");
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                      fontWeight: isSelected ? 600 : 400,
+                      color: isSelected ? "#16a34a" : "#6b7280",
+                      background: isSelected ? "#f0fdf4" : "transparent",
+                      transition: "background 0.12s",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected)
+                        (e.currentTarget as HTMLDivElement).style.background =
+                          "#f9fafb";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLDivElement).style.background =
+                        isSelected ? "#f0fdf4" : "transparent";
+                    }}
+                  >
+                    <span>{opt.label}</span>
+                    {isSelected && (
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#16a34a"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+          {!search && options.length > 5 && (
+            <div
+              style={{
+                padding: "6px 14px 4px",
+                fontSize: "12px",
+                color: "#9ca3af",
+                borderTop: "1px solid #f3f4f6",
+              }}
+            >
+              Showing 5 of {options.length} — type to search
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── PartsSubSection ─────────────────────────────────────────────────────────
+
+type PartRow = {
+  parts_item_no: string;
+  parts_qty: number;
+  parts_unit_price: number | null;
+};
+
+interface PartsSubSectionProps {
+  lot_no?: string | null;
+  item_no?: string;
+  parts: PartRow[];
+  onChange: (parts: PartRow[]) => void;
+  unitPriceLocked?: boolean;
+}
+
+const EMPTY_PART = (): PartRow => ({
+  parts_item_no: "",
+  parts_qty: 1,
+  parts_unit_price: null,
+});
+
+const PartsSubSection: React.FC<PartsSubSectionProps> = ({
+  lot_no,
+  item_no,
+  parts,
+  onChange,
+  unitPriceLocked,
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  const { data: touchupData, isFetching } = useGetTouchupsQuery(
+    {
+      lot_no: lot_no || undefined,
+      sku: item_no || undefined,
+      isFromProps: true,
+      page_size: 100,
+    },
+    { skip: !expanded || !lot_no || !item_no },
+  );
+
+  const partPriceMap = new Map<string, number | null>(
+    (touchupData?.data ?? []).map((p: any) => [
+      p.parts_item_no,
+      p.unit_price != null ? Number(p.unit_price) : null,
+    ]),
+  );
+
+  const partsOptions: CustomDropdownOption[] = (touchupData?.data ?? []).map(
+    (p: any) => ({
+      value: p.parts_item_no,
+      label: p.parts_item_name
+        ? `${p.parts_item_no} — ${p.parts_item_name}`
+        : p.parts_item_no,
+    }),
+  );
+
+  const updateRow = (i: number, patch: Partial<PartRow>) => {
+    const next = parts.map((r, idx) => (idx === i ? { ...r, ...patch } : r));
+    onChange(next);
+  };
+
+  const selectPartForRow = (i: number, val: string) => {
+    const price = partPriceMap.has(val) ? partPriceMap.get(val)! : null;
+    updateRow(i, { parts_item_no: val, parts_unit_price: price });
+  };
+
+  const addRow = () => onChange([...parts, EMPTY_PART()]);
+
+  const removeRow = (i: number) =>
+    onChange(parts.filter((_, idx) => idx !== i));
+
+  const fieldStyle: React.CSSProperties = {
+    padding: "7px 10px",
+    border: "1.5px solid #e5e7eb",
+    borderRadius: "8px",
+    fontSize: "13px",
+    background: "#f9fafb",
+    color: "#111827",
+    width: "100%",
+    boxSizing: "border-box",
+  };
+
+  if (unitPriceLocked) {
+    return (
+      <div
+        style={{
+          marginTop: "10px",
+          borderTop: "1px dashed #e5e7eb",
+          paddingTop: "10px",
+        }}
+      >
+        <span style={{ fontSize: "12px", fontWeight: 600, color: "#9ca3af" }}>
+          Parts Line Items — disabled (Wash Whole Unit selected)
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        marginTop: "10px",
+        borderTop: "1px dashed #e5e7eb",
+        paddingTop: "10px",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((p) => !p)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: 0,
+          fontSize: "12px",
+          fontWeight: 600,
+          color: "#6366f1",
+          marginBottom: expanded ? "10px" : 0,
+        }}
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
+            transition: "transform 0.2s",
+          }}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+        Parts Line Items{" "}
+        {parts.length > 0 && (
+          <span
+            style={{
+              marginLeft: "4px",
+              fontSize: "11px",
+              background: "#ede9fe",
+              color: "#6366f1",
+              borderRadius: "10px",
+              padding: "1px 7px",
+            }}
+          >
+            {parts.length}
+          </span>
+        )}
+      </button>
+
+      {expanded && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {isFetching && (
+            <div
+              style={{ fontSize: "12px", color: "#9ca3af", padding: "4px 0" }}
+            >
+              Loading parts…
+            </div>
+          )}
+
+          {parts.map((row, i) => {
+            const lineAmount =
+              row.parts_unit_price != null && row.parts_qty >= 1
+                ? (Number(row.parts_unit_price) * row.parts_qty).toFixed(2)
+                : null;
+
+            return (
+              <div
+                key={i}
+                style={{
+                  background: "#f8f7ff",
+                  border: "1px solid #ddd6fe",
+                  borderRadius: "8px",
+                  padding: "10px 12px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "8px",
+                }}
+              >
+                {/* Row header */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "#7c3aed",
+                    }}
+                  >
+                    Part {i + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeRow(i)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "#ef4444",
+                      fontSize: "16px",
+                      lineHeight: 1,
+                      padding: "0 2px",
+                    }}
+                    title="Remove part"
+                  >
+                    ×
+                  </button>
+                </div>
+
+                {/* Part Item No dropdown */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#6b7280",
+                    }}
+                  >
+                    Part Item No
+                  </span>
+                  {!isFetching && partsOptions.length === 0 ? (
+                    <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+                      No parts found for this item.
+                    </div>
+                  ) : (
+                    <SearchableDropdown
+                      value={row.parts_item_no}
+                      onChange={(val) => selectPartForRow(i, val)}
+                      options={partsOptions}
+                      placeholder="— select part —"
+                    />
+                  )}
+                </div>
+
+                {/* Qty / Unit Price / Line Amount */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "80px 1fr 1fr",
+                    gap: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Qty
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={row.parts_qty}
+                      onKeyDown={(e) => {
+                        if (/^[0-9]$/.test(e.key))
+                          (e.target as HTMLInputElement).select();
+                      }}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        if (isNaN(v)) return;
+                        updateRow(i, { parts_qty: Math.min(5, Math.max(1, v)) });
+                      }}
+                      style={fieldStyle}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Unit Price
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={row.parts_unit_price ?? ""}
+                      onChange={(e) => {
+                        if (unitPriceLocked) return;
+                        const v = parseFloat(e.target.value);
+                        updateRow(i, { parts_unit_price: isNaN(v) ? null : v });
+                      }}
+                      readOnly={unitPriceLocked}
+                      placeholder="0.00"
+                      style={{
+                        ...fieldStyle,
+                        ...(unitPriceLocked
+                          ? {
+                              background: "#f3f4f6",
+                              color: "#9ca3af",
+                              cursor: "not-allowed",
+                            }
+                          : {}),
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Line Amount
+                    </span>
+                    <div
+                      style={{
+                        ...fieldStyle,
+                        color: lineAmount != null ? "#047857" : "#9ca3af",
+                        background: lineAmount != null ? "#f0fdf4" : "#f9fafb",
+                        fontWeight: lineAmount != null ? 600 : 400,
+                      }}
+                    >
+                      {lineAmount != null ? `$${lineAmount}` : "—"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={addRow}
+            style={{
+              padding: "6px 14px",
+              border: "1.5px dashed #c4b5fd",
+              borderRadius: "8px",
+              background: "#f5f3ff",
+              color: "#6366f1",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: 600,
+              alignSelf: "flex-start",
+            }}
+          >
+            + Add Part
+          </button>
         </div>
       )}
     </div>
@@ -599,12 +1205,16 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     string | undefined
   >(undefined);
   const [showOrderDropdown, setShowOrderDropdown] = useState(false);
+  const [availableLineItems, setAvailableLineItems] = useState<any[]>([]);
+  const [lineItemProductIds, setLineItemProductIds] = useState<(string | null)[]>([null]);
+  const [creatingProductIndices, setCreatingProductIndices] = useState<Set<number>>(new Set());
+  const [confirmCreateModal, setConfirmCreateModal] = useState<number | null>(null);
   const orderSearchRef = useRef<HTMLDivElement>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { data: orderSearchData, isFetching: isOrderSearching } =
-    useGetCustomerOrdersQuery(
-      { page: 1, page_size: 10, source: "Orders", order_id: orderSearchFilter },
+    useGetShopifyLineItemsQuery(
+      { order_id: orderSearchFilter! },
       { skip: !orderSearchFilter },
     );
   const orderSuggestions = useMemo(
@@ -624,13 +1234,33 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  // ── Reason code ───────────────────────────────────────────────────────────
+  const [selectedReasonCode, setSelectedReasonCode] = useState("");
+  const [washWholeUnit, setWashWholeUnit] = useState(false);
+  const { data: returnReasonsData } = useGetShopifyReturnReasonsQuery();
+  const reasonCodeOptions = (returnReasonsData?.data ?? []).map((r) => ({
+    value: r.Code,
+    label: `${r.Code} — ${r.Description}`,
+  }));
+
   // ── Create mode: mutations ────────────────────────────────────────────────
   const [createOrder, { isLoading, data, error }] = useCreateOrderMutation();
   const [
     createDraftOrder,
     { isLoading: isDraftLoading, data: draftData, error: draftError },
   ] = useCreateDraftOrderMutation();
-  const { data: products, isLoading: productsLoading } =
+  const [createProduct, { isLoading: isProductCreating }] =
+    useCreateProductMutation();
+
+  // ── Create Product: form state ────────────────────────────────────────────
+  const [productForm, setProductForm] = useState({
+    title: "",
+    price: "",
+    sku: "",
+    product_type: "",
+    vendor: "",
+  });
+  const { data: products, isLoading: productsLoading, refetch: refetchProducts } =
     useGetProductsQuery(selectedStore);
 
   const variantOptions = useMemo<VariantOption[]>(() => {
@@ -644,6 +1274,17 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       })),
     );
   }, [products]);
+
+  const getProductVariants = (productId: string | null): ProductVariant[] => {
+    if (!productId || !products) return [];
+    const product = products.find((p) => p.id === productId);
+    return product ? product.variants.edges.map((e) => e.node) : [];
+  };
+
+  const productHasVariantChoice = (productId: string | null): boolean => {
+    const variants = getProductVariants(productId);
+    return variants.length > 1 || (variants.length === 1 && variants[0].title !== "Default Title");
+  };
 
   // ── Create mode: form state ───────────────────────────────────────────────
   const [form, setForm] = useState<OrderFormState>({
@@ -789,7 +1430,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   const {
     data: orderDetailData,
     isFetching: isLoadingLineItems,
-    isError: isLineItemsError,
+    isError: _isLineItemsError,
     refetch: refetchLineItems,
   } = useGetOrderLineItemsQuery(
     { orderId: loadLineItemsOrderId, store: selectedStore },
@@ -927,6 +1568,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       shippingAddress: { ...defaultAddress },
       billingAddress: { ...defaultAddress },
     });
+    setLineItemProductIds([null]);
     setOrderSearchInput("");
     setOrderSearchFilter(undefined);
     // Edit mode
@@ -975,40 +1617,71 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   };
 
   const handleSelectOrder = (order: any) => {
-    const nameParts = (order.customer_name || "").trim().split(" ");
-    const firstName = nameParts[0] || "";
-    const lastName = nameParts.slice(1).join(" ") || "";
+    const allRows: any[] = orderSuggestions.filter(
+      (r: any) => r.order_id === order.order_id,
+    );
+
+    // Store rows for the dropdown — user picks which to add
+    setAvailableLineItems(allRows);
+    setLineItemProductIds([]);
+
     setForm((prev) => ({
       ...prev,
-      email:
-        order.customer_email && order.customer_email !== "N/A"
-          ? order.customer_email
-          : prev.email,
+      email: order.customer_email || prev.email,
+      lineItems: [],
       shippingAddress: {
         ...prev.shippingAddress,
-        firstName,
-        lastName,
-        address1:
-          order.ship_to_address && order.ship_to_address !== "N/A"
-            ? order.ship_to_address
-            : "",
-        address2:
-          order.shipping_address && order.shipping_address !== "N/A"
-            ? order.shipping_address
-            : "",
-        city:
-          order.ship_to_city && order.ship_to_city !== "N/A"
-            ? order.ship_to_city
-            : "",
-        zip:
-          order.shipping_zip_code && order.shipping_zip_code !== "N/A"
-            ? order.shipping_zip_code
-            : "",
-        phone: order.phone_no && order.phone_no !== "N/A" ? order.phone_no : "",
+        firstName: order.first_name || prev.shippingAddress.firstName,
+        lastName: order.last_name || prev.shippingAddress.lastName,
+        address1: order.address || "",
+        company: order.company || "",
+        zip: order.zip_code || "",
+        provinceCode: order.state_code || "",
+        countryCode: order.country_code || "",
+        phone: order.phone_no || "",
       },
     }));
     setOrderSearchInput(order.order_id || "");
     setShowOrderDropdown(false);
+  };
+
+  const handleAddLineItemFromDropdown = (row: any) => {
+    const description: string = (row.description || "").trim().toLowerCase();
+    const matchedProduct = products?.find(
+      (p) => p.title.trim().toLowerCase() === description,
+    ) ?? null;
+
+    let autoVariantId = "";
+    if (matchedProduct) {
+      const variants = matchedProduct.variants.edges;
+      if (variants.length === 1 || variants[0]?.node.title === "Default Title") {
+        autoVariantId = variants[0]?.node.id ?? "";
+      }
+    }
+
+    const isUnmatched = !matchedProduct && !!(row.description || row.item_no);
+    const newItem: LineItem = {
+      variantId: autoVariantId,
+      quantity: row.quantity != null ? Number(row.quantity) : 1,
+      item_no: row.item_no || undefined,
+      lot_no: row.lot_no ?? undefined,
+      unit_price: row.unit_price ?? null,
+      description: row.description || null,
+      // pre-populate custom fields for use in the confirm modal (not auto-ticked)
+      ...(isUnmatched && {
+        customTitle: row.description || row.item_no || "",
+        customSku: row.item_no || "",
+        customProductType: row.lot_no || "",
+        customPrice: row.unit_price != null ? String(row.unit_price) : "",
+        customVendor: selectedStoreOption.label,
+      }),
+    };
+
+    setLineItemProductIds((prev) => [...prev, matchedProduct?.id ?? null]);
+    setForm((prev) => ({
+      ...prev,
+      lineItems: [...prev.lineItems, newItem],
+    }));
   };
 
   const handleChange = (
@@ -1036,34 +1709,146 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     setForm({ ...form, lineItems: newLineItems });
   };
 
-  const addLineItem = () =>
-    setForm({
-      ...form,
-      lineItems: [...form.lineItems, { variantId: "", quantity: 1 }],
-    });
-  const removeLineItem = (index: number) =>
+  const addLineItem = () => {
+    setLineItemProductIds((prev) => [...prev, null]);
+    setForm((prev) => ({
+      ...prev,
+      lineItems: [...prev.lineItems, { variantId: "", quantity: 1 }],
+    }));
+  };
+  const _removeLineItem = (index: number) =>
     setForm({
       ...form,
       lineItems: form.lineItems.filter((_, i) => i !== index),
     });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateCustomProduct = async (index: number) => {
+    const item = form.lineItems[index];
+    if (!item) return;
+
+    setConfirmCreateModal(null);
+    setCreatingProductIndices((prev) => new Set([...prev, index]));
     try {
-      await createOrder({
+      const result = await createProduct({
         store: selectedStore,
-        email: form.email,
-        tags: [selectedTag],
-        lineItems: form.lineItems,
-        shippingAddress: form.shippingAddress,
-        inventoryBehaviour: "BYPASS",
-        sendReceipt: false,
-        sendFulfillmentReceipt: false,
+        title: item.customTitle || item.item_no || "Custom Item",
+        price: parseFloat(item.customPrice || "0") || 0,
+        sku: item.customSku || item.item_no || undefined,
+        product_type: item.customProductType || undefined,
+        vendor: item.customVendor || selectedStoreOption.label,
       }).unwrap();
-      toast.success("Order created successfully!");
+
+      const variantId: string = result?.data?.variants?.[0]?.id ?? "";
+      const productId: string | null = result?.data?.id ?? null;
+
+      setForm((prev) => {
+        const newItems = [...prev.lineItems];
+        newItems[index] = { ...newItems[index], variantId, isCustomProduct: false };
+        return { ...prev, lineItems: newItems };
+      });
+
+      if (productId) {
+        setLineItemProductIds((prev) => {
+          const next = [...prev];
+          next[index] = productId;
+          return next;
+        });
+      }
+
+      toast.success("Custom product created and linked!");
     } catch (err) {
       console.error(err);
-      toast.error("Error creating order");
+      toast.error("Failed to create custom product");
+    } finally {
+      setCreatingProductIndices((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
+    }
+  };
+
+  const buildProperties = (item: LineItem): { name: string; value: string }[] => {
+    const props: { name: string; value: string }[] = [];
+    if (item.item_no) props.push({ name: "item_no", value: item.item_no });
+    if (item.lot_no) props.push({ name: "lot_no", value: item.lot_no });
+    if (item.unit_price != null) props.push({ name: "unit_price", value: String(item.unit_price) });
+    if (selectedReasonCode) props.push({ name: "reason_code", value: selectedReasonCode });
+    if (item.return_reason_code) props.push({ name: "return_reason_code", value: item.return_reason_code });
+    if (!washWholeUnit) {
+      (item.parts ?? []).forEach((part, i) => {
+        const n = i + 1;
+        props.push({ name: `part_${n}_item_no`, value: part.parts_item_no });
+        props.push({ name: `part_${n}_qty`, value: String(part.parts_qty) });
+        if (part.parts_unit_price != null)
+          props.push({ name: `part_${n}_unit_price`, value: String(part.parts_unit_price) });
+      });
+    }
+    return props;
+  };
+
+  const buildLineItemsPayload = (items: LineItem[]) =>
+    items.map((item) => {
+      const properties = buildProperties(item);
+      if (item.isCustomProduct) {
+        return {
+          quantity: item.quantity,
+          title: item.customTitle || item.item_no || "Custom Item",
+          price: item.customPrice || (item.unit_price != null ? String(item.unit_price) : "0.00"),
+          sku: item.customSku || item.item_no || undefined,
+          vendor: item.customVendor || selectedStoreOption.label,
+          ...(properties.length > 0 && { properties }),
+        };
+      }
+      return {
+        variantId: item.variantId,
+        quantity: item.quantity,
+        ...(properties.length > 0 && { properties }),
+      };
+    });
+
+  const allPricesZero = (items: LineItem[]) =>
+    items.length > 0 &&
+    items.every((item) => {
+      const lineZero = item.unit_price == null || Number(item.unit_price) === 0;
+      const partsZero =
+        !item.parts ||
+        item.parts.length === 0 ||
+        item.parts.every(
+          (p) => p.parts_unit_price == null || Number(p.parts_unit_price) === 0,
+        );
+      return lineZero && partsZero;
+    });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const shouldCreateOrder = washWholeUnit || allPricesZero(form.lineItems);
+    try {
+      if (shouldCreateOrder) {
+        await createOrder({
+          store: selectedStore,
+          email: form.email,
+          tags: [selectedTag],
+          lineItems: buildLineItemsPayload(form.lineItems),
+          shippingAddress: form.shippingAddress,
+          inventoryBehaviour: "BYPASS",
+          sendReceipt: false,
+          sendFulfillmentReceipt: false,
+        }).unwrap();
+        toast.success("Order created successfully!");
+      } else {
+        await createDraftOrder({
+          store: selectedStore,
+          email: form.email,
+          tags: [selectedTag],
+          lineItems: buildLineItemsPayload(form.lineItems),
+          shippingAddress: form.shippingAddress,
+        }).unwrap();
+        toast.success("Draft order created successfully!");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(shouldCreateOrder ? "Error creating order" : "Error creating draft order");
     }
   };
 
@@ -1074,7 +1859,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         store: selectedStore,
         email: form.email,
         tags: [selectedTag],
-        lineItems: form.lineItems,
+        lineItems: buildLineItemsPayload(form.lineItems),
         shippingAddress: form.shippingAddress,
       }).unwrap();
       toast.success("Draft order created successfully!");
@@ -1085,11 +1870,15 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   };
 
   // ── Edit mode: handlers ───────────────────────────────────────────────────
-  const addCustomAttr = () =>
+  const _addCustomAttr = () =>
     setCustomAttrs([...customAttrs, { key: "", value: "" }]);
-  const removeCustomAttr = (i: number) =>
+  const _removeCustomAttr = (i: number) =>
     setCustomAttrs(customAttrs.filter((_, idx) => idx !== i));
-  const updateCustomAttr = (i: number, field: "key" | "value", val: string) => {
+  const _updateCustomAttr = (
+    i: number,
+    field: "key" | "value",
+    val: string,
+  ) => {
     setCustomAttrs(
       customAttrs.map((a, idx) => (idx === i ? { ...a, [field]: val } : a)),
     );
@@ -1367,6 +2156,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       title: "Edit Draft Order",
       subtitle: "Update details on an existing draft order",
     },
+    createProduct: {
+      title: "Create Product",
+      subtitle: "Create a new Shopify product with a variant",
+    },
   };
 
   return (
@@ -1469,6 +2262,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               { key: "create", label: "Create Order" },
               { key: "editOrder", label: "Edit Order" },
               { key: "editDraft", label: "Edit Draft" },
+              { key: "createProduct", label: "Create Product" },
             ] as { key: FormMode; label: string }[]
           ).map(({ key, label }) => (
             <button
@@ -1560,7 +2354,12 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     padding: "6px",
                   }}
                 >
-                  {orderSuggestions.map((order: any) => (
+                  {/* Deduplicate by order_id — show one row per unique order */}
+                  {Array.from(
+                    new Map(
+                      orderSuggestions.map((o: any) => [o.order_id, o]),
+                    ).values(),
+                  ).map((order: any) => (
                     <div
                       key={order.order_id}
                       onClick={() => handleSelectOrder(order)}
@@ -1583,23 +2382,22 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                       <span style={{ fontWeight: 600, color: "#4f46e5" }}>
                         #{order.order_id}
                       </span>
-                      {order.customer_name && order.customer_name !== "N/A" && (
+                      {order.customer_email && (
                         <span style={{ marginLeft: "10px", color: "#6b7280" }}>
-                          {order.customer_name}
+                          {order.customer_email}
                         </span>
                       )}
-                      {order.customer_email &&
-                        order.customer_email !== "N/A" && (
-                          <span
-                            style={{
-                              marginLeft: "10px",
-                              color: "#9ca3af",
-                              fontSize: "12px",
-                            }}
-                          >
-                            {order.customer_email}
-                          </span>
-                        )}
+                      {order.phone_no && (
+                        <span
+                          style={{
+                            marginLeft: "10px",
+                            color: "#9ca3af",
+                            fontSize: "12px",
+                          }}
+                        >
+                          {order.phone_no}
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1662,121 +2460,523 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             </div>
           </div>
 
+          {/* Reason Code + Wash Whole Unit */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: "16px",
+              alignItems: "end",
+              marginBottom: "20px",
+            }}
+          >
+            <div style={fieldWrap}>
+              <label style={labelStyle}>Reason Code</label>
+              <SearchableDropdown
+                value={selectedReasonCode}
+                onChange={setSelectedReasonCode}
+                options={reasonCodeOptions}
+                placeholder="— select reason code —"
+              />
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                paddingBottom: "2px",
+                cursor: "pointer",
+                userSelect: "none",
+              }}
+              onClick={() => {
+                setWashWholeUnit((p) => {
+                  const next = !p;
+                  if (next) {
+                    setForm((prev) => ({
+                      ...prev,
+                      lineItems: prev.lineItems.map((item) => ({ ...item, parts: [] })),
+                    }));
+                  }
+                  return next;
+                });
+              }}
+            >
+              <div
+                style={{
+                  width: "18px",
+                  height: "18px",
+                  borderRadius: "4px",
+                  border: `2px solid ${washWholeUnit ? "#6366f1" : "#d1d5db"}`,
+                  background: washWholeUnit ? "#6366f1" : "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  transition: "all 0.15s",
+                }}
+              >
+                {washWholeUnit && (
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+              </div>
+              <span
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#374151",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Wash Whole Unit
+              </span>
+            </div>
+          </div>
+
           {/* Line Items */}
           <div style={{ marginBottom: "20px" }}>
             <label style={{ ...labelStyle, marginBottom: "10px" }}>
               Line Items *
             </label>
+
+            {/* Dropdown to pick a line item from the selected order */}
+            {availableLineItems.length > 0 && (
+              <div style={{ marginBottom: "12px" }}>
+                <select
+                  defaultValue=""
+                  onChange={(e) => {
+                    const idx = parseInt(e.target.value, 10);
+                    if (!isNaN(idx)) {
+                      handleAddLineItemFromDropdown(availableLineItems[idx]);
+                      e.target.value = "";
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "9px 12px",
+                    border: "1.5px solid #a5b4fc",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    color: "#374151",
+                    background: "#f5f3ff",
+                    cursor: "pointer",
+                  }}
+                >
+                  <option value="" disabled>
+                    — select line item to add —
+                  </option>
+                  {availableLineItems.map((row, i) => (
+                    <option key={i} value={i}>
+                      {[row.item_no, row.lot_no].filter(Boolean).join(" / ")}
+                      {row.description ? ` — ${row.description}` : ""}
+                      {row.quantity != null ? ` — Qty: ${row.quantity}` : ""}
+                      {row.unit_price != null ? ` — $${row.unit_price}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {form.lineItems.map((item, index) => (
               <div
                 key={index}
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 140px auto",
-                  gap: "12px",
+                  border: "1.5px solid #e5e7eb",
+                  borderRadius: "12px",
+                  padding: "14px 16px",
                   marginBottom: "10px",
-                  alignItems: "center",
+                  background: "#fff",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
                 }}
               >
-                <Autocomplete
-                  options={variantOptions}
-                  loading={productsLoading}
-                  getOptionLabel={(o) => o.label}
-                  isOptionEqualToValue={(o, v) => o.variantId === v.variantId}
-                  value={
-                    variantOptions.find(
-                      (o) => o.variantId === item.variantId,
-                    ) ?? null
-                  }
-                  onChange={(_, selected) =>
-                    handleLineItemChange(
-                      index,
-                      "variantId",
-                      selected?.variantId ?? "",
-                    )
-                  }
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
-                      placeholder="Search product variant..."
-                      required
-                      size="small"
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          borderRadius: "8px",
-                          fontSize: "14px",
-                          "& fieldset": { borderColor: "#e5e7eb" },
-                        },
-                      }}
-                      slotProps={{
-                        input: {
-                          ...params.InputProps,
-                          endAdornment: (
-                            <>
-                              {productsLoading && (
-                                <CircularProgress color="inherit" size={14} />
-                              )}
-                              {params.InputProps.endAdornment}
-                            </>
-                          ),
-                        },
-                      }}
-                    />
-                  )}
-                />
-                <input
-                  type="number"
-                  min={1}
-                  defaultValue={item.quantity}
-                  key={`qty-${index}`}
-                  onChange={(e) => {
-                    const parsed = parseInt(e.target.value, 10);
-                    if (!isNaN(parsed) && parsed >= 1)
-                      handleLineItemChange(index, "quantity", parsed);
+                {/* Row header: line number badge + remove */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: "12px",
                   }}
-                  required
-                  placeholder="Qty"
-                  style={inputStyle}
-                />
-                {form.lineItems.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => removeLineItem(index)}
+                >
+                  <span
                     style={{
-                      padding: "8px 14px",
-                      border: "1.5px solid #fca5a5",
-                      borderRadius: "8px",
-                      background: "#fff",
-                      color: "#dc2626",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "#6366f1",
+                      background: "#ede9fe",
+                      borderRadius: "4px",
+                      padding: "2px 8px",
                     }}
                   >
-                    Remove
+                    Line {index + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLineItemProductIds((prev) => prev.filter((_, i) => i !== index));
+                      setForm((prev) => ({
+                        ...prev,
+                        lineItems: prev.lineItems.filter((_, i) => i !== index),
+                      }));
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "#ef4444",
+                      fontSize: "18px",
+                      lineHeight: 1,
+                      padding: "0 2px",
+                    }}
+                    title="Remove line item"
+                  >
+                    ×
                   </button>
-                ) : (
-                  <div />
+                </div>
+
+                {/* Product + Variant selectors */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: productHasVariantChoice(lineItemProductIds[index]) ? "1fr 1fr" : "1fr",
+                    gap: "10px",
+                    marginBottom: "10px",
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}>
+                      Product
+                    </span>
+                    <select
+                      value={lineItemProductIds[index] ?? ""}
+                      onChange={(e) => {
+                        const productId = e.target.value || null;
+                        setLineItemProductIds((prev) => {
+                          const next = [...prev];
+                          next[index] = productId;
+                          return next;
+                        });
+                        if (productId && products) {
+                          const product = products.find((p) => p.id === productId);
+                          if (product) {
+                            const variants = product.variants.edges;
+                            const autoVariant =
+                              variants.length === 1 || variants[0]?.node.title === "Default Title"
+                                ? variants[0]?.node.id ?? ""
+                                : "";
+                            handleLineItemChange(index, "variantId", autoVariant);
+                          }
+                        } else {
+                          handleLineItemChange(index, "variantId", "");
+                        }
+                      }}
+                      style={{ ...inputStyle, cursor: "pointer" }}
+                    >
+                      <option value="">— select product —</option>
+                      {(products ?? []).map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {productHasVariantChoice(lineItemProductIds[index]) && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}>
+                        Variant
+                      </span>
+                      <select
+                        value={item.variantId}
+                        onChange={(e) => handleLineItemChange(index, "variantId", e.target.value)}
+                        style={{ ...inputStyle, cursor: "pointer" }}
+                      >
+                        <option value="">— select variant —</option>
+                        {getProductVariants(lineItemProductIds[index]).map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.title}{v.sku ? ` (${v.sku})` : ""} · ${v.price}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom product checkbox — shown when no product matched */}
+                {!lineItemProductIds[index] && item.item_no && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      marginBottom: "10px",
+                      cursor: creatingProductIndices.has(index) ? "not-allowed" : "pointer",
+                      userSelect: "none",
+                      opacity: creatingProductIndices.has(index) ? 0.7 : 1,
+                    }}
+                    onClick={() => {
+                      if (creatingProductIndices.has(index)) return;
+                      setConfirmCreateModal(index);
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "16px",
+                        height: "16px",
+                        borderRadius: "4px",
+                        border: "2px solid #d1d5db",
+                        background: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {creatingProductIndices.has(index) && (
+                        <CircularProgress size={10} style={{ color: "#f59e0b" }} />
+                      )}
+                    </div>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: "#b45309" }}>
+                      {creatingProductIndices.has(index) ? "Creating product…" : "Add as custom product"}
+                    </span>
+                    <span style={{ fontSize: "11px", color: "#9ca3af" }}>— not found in Shopify products</span>
+                  </div>
                 )}
+
+                {/* Description — full width */}
+                {item.description && (
+                  <div style={{ marginBottom: "10px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280", display: "block", marginBottom: "4px" }}>
+                      Description
+                    </span>
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        border: "1.5px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        color: "#111827",
+                        background: "#f9fafb",
+                      }}
+                    >
+                      {item.description}
+                    </div>
+                  </div>
+                )}
+
+                {/* Info fields + Quantity: single row */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(4, 1fr) 90px",
+                    gap: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Item No
+                    </span>
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        border: "1.5px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        color: item.item_no ? "#111827" : "#9ca3af",
+                        background: "#f9fafb",
+                      }}
+                    >
+                      {item.item_no || "—"}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Lot No
+                    </span>
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        border: "1.5px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        color: item.lot_no ? "#111827" : "#9ca3af",
+                        background: "#f9fafb",
+                      }}
+                    >
+                      {item.lot_no || "—"}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Unit Price
+                    </span>
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        border: "1.5px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        color: item.unit_price != null ? "#111827" : "#9ca3af",
+                        background: "#f9fafb",
+                      }}
+                    >
+                      {item.unit_price != null
+                        ? `$${Number(item.unit_price).toFixed(2)}`
+                        : "—"}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Line Amount
+                    </span>
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        border: "1.5px solid #e5e7eb",
+                        borderRadius: "8px",
+                        fontSize: "13px",
+                        color: item.unit_price != null ? "#047857" : "#9ca3af",
+                        background:
+                          item.unit_price != null ? "#f0fdf4" : "#f9fafb",
+                        fontWeight: item.unit_price != null ? 600 : 400,
+                      }}
+                    >
+                      {item.unit_price != null
+                        ? `$${(Number(item.unit_price) * item.quantity).toFixed(2)}`
+                        : "—"}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Qty
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={item.quantity}
+                      disabled={washWholeUnit}
+                      onKeyDown={(e) => {
+                        if (/^[0-9]$/.test(e.key))
+                          (e.target as HTMLInputElement).select();
+                      }}
+                      onChange={(e) => {
+                        const parsed = parseInt(e.target.value, 10);
+                        if (isNaN(parsed)) return;
+                        const clamped = Math.min(5, Math.max(1, parsed));
+                        handleLineItemChange(index, "quantity", clamped);
+                      }}
+                      required
+                      placeholder="Qty"
+                      style={{
+                        ...inputStyle,
+                        ...(washWholeUnit
+                          ? { background: "#f3f4f6", color: "#9ca3af", cursor: "not-allowed" }
+                          : {}),
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <PartsSubSection
+                  lot_no={item.lot_no}
+                  item_no={item.item_no}
+                  parts={item.parts ?? []}
+                  onChange={(parts) =>
+                    handleLineItemChange(index, "parts", parts)
+                  }
+                  unitPriceLocked={washWholeUnit}
+                />
               </div>
             ))}
-            <button
-              type="button"
-              onClick={addLineItem}
-              style={{
-                padding: "8px 16px",
-                border: "1.5px dashed #a5b4fc",
-                borderRadius: "8px",
-                background: "#f5f3ff",
-                color: "#4f46e5",
-                cursor: "pointer",
-                fontSize: "13px",
-                fontWeight: 600,
-              }}
-            >
-              + Add Line Item
-            </button>
+            {availableLineItems.length === 0 && (
+              <button
+                type="button"
+                onClick={addLineItem}
+                style={{
+                  padding: "8px 16px",
+                  border: "1.5px dashed #a5b4fc",
+                  borderRadius: "8px",
+                  background: "#f5f3ff",
+                  color: "#4f46e5",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                + Add Line Item
+              </button>
+            )}
           </div>
 
           {/* Shipping Address */}
@@ -2015,44 +3215,126 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             </button>
             <div style={{ display: "flex", gap: "12px" }}>
               <button
-                type="button"
-                onClick={handleDraftSubmit}
-                disabled={isDraftLoading}
-                style={{
-                  padding: "10px 24px",
-                  border: "1.5px solid #0369a1",
-                  borderRadius: "8px",
-                  background: isDraftLoading ? "#e0f2fe" : "#fff",
-                  color: isDraftLoading ? "#93c5fd" : "#0369a1",
-                  cursor: isDraftLoading ? "not-allowed" : "pointer",
-                  fontSize: "14px",
-                  fontWeight: 600,
-                }}
-              >
-                {isDraftLoading ? "Creating Draft..." : "Create Draft Order"}
-              </button>
-              <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || isDraftLoading}
                 style={{
                   padding: "10px 28px",
                   border: "none",
                   borderRadius: "8px",
-                  background: isLoading
-                    ? "#a5b4fc"
-                    : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                  background:
+                    isLoading || isDraftLoading
+                      ? "#a5b4fc"
+                      : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
                   color: "#fff",
-                  cursor: isLoading ? "not-allowed" : "pointer",
+                  cursor: isLoading || isDraftLoading ? "not-allowed" : "pointer",
                   fontSize: "14px",
                   fontWeight: 700,
                 }}
               >
-                {isLoading ? "Creating..." : "+ Create Order"}
+                {isLoading || isDraftLoading
+                  ? "Submitting..."
+                  : washWholeUnit || allPricesZero(form.lineItems)
+                  ? "+ Create Order"
+                  : "+ Create Draft Order"}
               </button>
             </div>
           </div>
         </form>
       )}
+
+      {/* ── Custom product confirmation modal ─────────────────────────────── */}
+      {confirmCreateModal !== null && (() => {
+        const item = form.lineItems[confirmCreateModal];
+        if (!item) return null;
+        return (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.45)",
+              zIndex: 9999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            onClick={() => setConfirmCreateModal(null)}
+          >
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: "16px",
+                padding: "28px 32px",
+                minWidth: "360px",
+                maxWidth: "480px",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "18px" }}>
+                <div style={{ background: "#fffbeb", borderRadius: "50%", padding: "8px", display: "flex" }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: "#111827" }}>Create Custom Product?</div>
+                  <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "2px" }}>This will add a new product to your Shopify store.</div>
+                </div>
+              </div>
+
+              <div style={{ background: "#f9fafb", borderRadius: "10px", padding: "14px 16px", marginBottom: "20px" }}>
+                {[
+                  ["Title", item.customTitle || item.item_no],
+                  ["Price", item.customPrice ? `$${item.customPrice}` : item.unit_price != null ? `$${item.unit_price}` : "—"],
+                  ["SKU", item.customSku || item.item_no],
+                  ["Product Type", item.customProductType || item.lot_no || "—"],
+                  ["Vendor", item.customVendor || selectedStoreOption.label],
+                ].map(([label, value]) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid #f3f4f6" }}>
+                    <span style={{ fontSize: "12px", color: "#6b7280", fontWeight: 600 }}>{label}</span>
+                    <span style={{ fontSize: "13px", color: "#111827", fontWeight: 500 }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => setConfirmCreateModal(null)}
+                  style={{
+                    padding: "9px 22px",
+                    border: "1.5px solid #e5e7eb",
+                    borderRadius: "8px",
+                    background: "#fff",
+                    color: "#374151",
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  No, Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCreateCustomProduct(confirmCreateModal)}
+                  style={{
+                    padding: "9px 22px",
+                    border: "none",
+                    borderRadius: "8px",
+                    background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                    color: "#fff",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  Yes, Create Product
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ════════════════════════════════════════════════
           EDIT ORDER MODE
@@ -2709,6 +3991,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                               <Autocomplete
                                 options={variantOptions}
                                 loading={productsLoading}
+                                getOptionKey={(o) => o.variantId}
                                 getOptionLabel={(o) => o.label}
                                 isOptionEqualToValue={(o, v) =>
                                   o.variantId === v.variantId
@@ -3711,6 +4994,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     <Autocomplete
                       options={variantOptions}
                       loading={productsLoading}
+                      getOptionKey={(o) => o.variantId}
                       getOptionLabel={(o) => o.label}
                       isOptionEqualToValue={(o, v) =>
                         o.variantId === v.variantId
@@ -3850,6 +5134,171 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             </form>
           )}
         </div>
+      )}
+
+      {/* ════════════════════════════════════════════════
+          CREATE PRODUCT MODE
+      ════════════════════════════════════════════════ */}
+      {mode === "createProduct" && (
+        <form
+          style={{ padding: "28px" }}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const price = parseFloat(productForm.price);
+            if (!productForm.title.trim()) {
+              toast.error("Title is required");
+              return;
+            }
+            if (isNaN(price) || price < 0) {
+              toast.error("Enter a valid price");
+              return;
+            }
+            try {
+              await createProduct({
+                store: selectedStore,
+                title: productForm.title.trim(),
+                price,
+                sku: productForm.sku.trim() || undefined,
+                product_type: productForm.product_type.trim() || undefined,
+                vendor: productForm.vendor.trim() || undefined,
+              }).unwrap();
+              toast.success("Product created successfully");
+              setProductForm({
+                title: "",
+                price: "",
+                sku: "",
+                product_type: "",
+                vendor: "",
+              });
+              refetchProducts();
+            } catch (err: any) {
+              toast.error(err?.data?.message || "Failed to create product");
+            }
+          }}
+        >
+          {/* Store */}
+          <div style={{ marginBottom: "20px" }}>
+            <label style={labelStyle}>Store</label>
+            <StoreDropdown
+              selectedLabel={selectedStoreOption.label}
+              onChange={setSelectedStoreOption}
+              options={STORE_OPTIONS}
+            />
+          </div>
+
+          {/* Title */}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={labelStyle}>Title *</label>
+            <input
+              style={inputStyle}
+              placeholder="e.g. Crib"
+              value={productForm.title}
+              onChange={(e) =>
+                setProductForm((p) => ({ ...p, title: e.target.value }))
+              }
+              required
+            />
+          </div>
+
+          {/* Price */}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={labelStyle}>Price *</label>
+            <input
+              style={inputStyle}
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="e.g. 25.00"
+              value={productForm.price}
+              onChange={(e) =>
+                setProductForm((p) => ({ ...p, price: e.target.value }))
+              }
+              required
+            />
+          </div>
+
+          {/* SKU */}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={labelStyle}>
+              SKU{" "}
+              <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+                (optional — auto-generated if blank)
+              </span>
+            </label>
+            <input
+              style={inputStyle}
+              placeholder="e.g. MUG-25-4821"
+              value={productForm.sku}
+              onChange={(e) =>
+                setProductForm((p) => ({ ...p, sku: e.target.value }))
+              }
+            />
+          </div>
+
+          {/* Product Type */}
+          <div style={{ marginBottom: "16px" }}>
+            <label style={labelStyle}>
+              Product Type{" "}
+              <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+                (default: Custom)
+              </span>
+            </label>
+            <input
+              style={inputStyle}
+              placeholder="e.g. Cribs"
+              value={productForm.product_type}
+              onChange={(e) =>
+                setProductForm((p) => ({ ...p, product_type: e.target.value }))
+              }
+            />
+          </div>
+
+          {/* Vendor */}
+          <div style={{ marginBottom: "24px" }}>
+            <label style={labelStyle}>
+              Vendor{" "}
+              <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+                (default: Custom Store)
+              </span>
+            </label>
+            <input
+              style={inputStyle}
+              placeholder="e.g. My Brand"
+              value={productForm.vendor}
+              onChange={(e) =>
+                setProductForm((p) => ({ ...p, vendor: e.target.value }))
+              }
+            />
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              borderTop: "1px solid #f3f4f6",
+              paddingTop: "20px",
+            }}
+          >
+            <button
+              type="submit"
+              disabled={isProductCreating}
+              style={{
+                padding: "10px 28px",
+                border: "none",
+                borderRadius: "8px",
+                background: isProductCreating
+                  ? "#a5b4fc"
+                  : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                color: "#fff",
+                cursor: isProductCreating ? "not-allowed" : "pointer",
+                fontSize: "14px",
+                fontWeight: 700,
+              }}
+            >
+              {isProductCreating ? "Creating..." : "Create Product"}
+            </button>
+          </div>
+        </form>
       )}
     </div>
   );
