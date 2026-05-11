@@ -469,6 +469,19 @@ export const inventoryApi = createApi({
       },
     }),
 
+    getDistinctTouchupItems: builder.query<
+      any,
+      { parts_item_no?: string; page?: number; page_size?: number }
+    >({
+      query: ({ parts_item_no, page = 1, page_size = 50 } = {}) => {
+        const params = new URLSearchParams();
+        params.set("page", page.toString());
+        params.set("page_size", page_size.toString());
+        if (parts_item_no) params.set("parts_item_no", parts_item_no);
+        return `touchup_part/distinct_items?${params.toString()}`;
+      },
+    }),
+
     getLifeCycleStatus: builder.query<any, string | void>({
       query: (name = "") => ({
         url: "/inventory/life_cycle_status",
@@ -492,6 +505,7 @@ export const {
   useGetLocationItemLotQuery,
   useGetTouchupsQuery,
   useGetTouchupPensQuery,
+  useGetDistinctTouchupItemsQuery,
   useGetLifeCycleStatusQuery,
   useGetNavETAQuery,
   useGetItemTrackingCommentsQuery,

@@ -169,7 +169,7 @@ export const shopifyApi = createApi({
         lineItems,
         shippingAddress,
       }) => ({
-        url: `/shopify/create-draft-order?store=${store}`,
+        url: `/shopify/create-smart-draft-order?store=${store}`,
         method: "POST",
         body: {
           draftOrder: {
@@ -437,6 +437,13 @@ export const shopifyApi = createApi({
       query: () => ({ url: `/shopify_return_reasons?page_size=100`, method: "GET" }),
     }),
 
+    getShopifyReturnReasonsCode: builder.query<
+      { data: { Code: string; Description: string }[]; total_records: number },
+      void
+    >({
+      query: () => ({ url: `/shopify_return_reasons_code?page_size=100`, method: "GET" }),
+    }),
+
     createProduct: builder.mutation<
       any,
       {
@@ -469,6 +476,7 @@ export const shopifyApi = createApi({
           quantity: number;
           zip_code: string;
           address: string;
+          city: string;
           state_code: string;
           country_code: string;
           company: string;
@@ -502,6 +510,7 @@ export const {
   useGetShopifyOrdersQuery,
   useGetShopifyDraftOrdersQuery,
   useGetShopifyReturnReasonsQuery,
+  useGetShopifyReturnReasonsCodeQuery,
   useGetShopifyLineItemsQuery,
   useCreateProductMutation,
 } = shopifyApi;
