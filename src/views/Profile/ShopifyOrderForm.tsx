@@ -1968,8 +1968,6 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       });
     if (selectedReasonCode)
       props.push({ name: "reason_code", value: selectedReasonCode });
-    if (item.reason_code)
-      props.push({ name: "line_reason_code", value: item.reason_code });
     return props;
   };
 
@@ -1982,14 +1980,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         : [];
 
       if (activeParts.length > 0) {
-        // Parts exist → each part is an inline custom product; Line 1 data + part reason code go as properties
+        // Parts exist → each part gets shared line props + its own return_reason_code
         for (const part of activeParts) {
           const partProps = [...properties];
           if (part.reason_code)
-            partProps.push({
-              name: "part_reason_code",
-              value: part.reason_code,
-            });
+            partProps.push({ name: "return_reason_code", value: part.reason_code });
           result.push({
             quantity: part.parts_qty,
             title: part.parts_item_no,
@@ -2002,13 +1997,16 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
           });
         }
       } else {
-        // No parts → line item itself goes as an inline custom product
+        // No parts → line item itself; reason code from the line-item dropdown
+        const lineProps = [...properties];
+        if (item.reason_code)
+          lineProps.push({ name: "return_reason_code", value: item.reason_code });
         result.push({
           quantity: item.quantity,
           title: item.description || item.item_no || "Custom Item",
           price: item.unit_price != null ? String(item.unit_price) : "0.00",
           sku: item.item_no || undefined,
-          ...(properties.length > 0 && { properties }),
+          ...(lineProps.length > 0 && { properties: lineProps }),
         });
       }
     }
