@@ -244,6 +244,11 @@ export const shopifyApi = createApi({
           title?: string;
           quantity: number;
           originalUnitPrice?: string;
+          reasonCode?: string;
+          returnReasonCode?: string;
+          sku?: string;
+          lotNo?: string;
+          itemNo?: string;
         }>;
       }
     >({
@@ -275,7 +280,9 @@ export const shopifyApi = createApi({
           price: string | null;
           sku: string | null;
         }>;
-        customItems: Array<{ title: string; quantity: number }>;
+        customItems: Array<{ title: string; quantity: number; price: string | null }>;
+        customAttributes: Array<{ key: string; value: string }>;
+        status: string | null;
       },
       { draftOrderId: string; store?: ShopifyStore }
     >({
@@ -288,7 +295,6 @@ export const shopifyApi = createApi({
       ],
       transformResponse: (response: { data: any }) => {
         const edges = response?.data?.lineItems?.edges ?? [];
-        // Use a Map to deduplicate variant-based items (same variantId → sum quantities)
         const variantMap = new Map<
           string,
           {
@@ -299,7 +305,7 @@ export const shopifyApi = createApi({
             sku: string | null;
           }
         >();
-        const customItems: Array<{ title: string; quantity: number }> = [];
+        const customItems: Array<{ title: string; quantity: number; price: string | null }> = [];
         for (const { node } of edges) {
           const variantId = node.variant?.id ?? null;
           if (variantId) {
@@ -318,10 +324,16 @@ export const shopifyApi = createApi({
             customItems.push({
               title: node.title ?? "",
               quantity: node.quantity ?? 0,
+              price: node.originalUnitPriceSet?.shopMoney?.amount ?? null,
             });
           }
         }
-        return { lineItems: Array.from(variantMap.values()), customItems };
+        return {
+          lineItems: Array.from(variantMap.values()),
+          customItems,
+          customAttributes: response?.data?.customAttributes ?? [],
+          status: response?.data?.status ?? null,
+        };
       },
     }),
 
