@@ -3608,7 +3608,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     marginBottom: "10px",
                   }}
                 >
-                  <div
+                  {/* <div
                     style={{
                       display: "flex",
                       flexDirection: "column",
@@ -3663,7 +3663,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </div> */}
 
                   {productHasVariantChoice(lineItemProductIds[index]) && (
                     <div
@@ -6240,7 +6240,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               )}
 
               {/* ── New items ── */}
-              <div style={{ marginBottom: "24px" }}>
+              {/* <div style={{ marginBottom: "24px" }}>
                 <div
                   style={{
                     display: "flex",
@@ -6404,7 +6404,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     </button>
                   </div>
                 ))}
-              </div>
+              </div> */}
 
               {/* ── Add Custom Items section ── */}
               <div style={{ marginBottom: "24px" }}>
