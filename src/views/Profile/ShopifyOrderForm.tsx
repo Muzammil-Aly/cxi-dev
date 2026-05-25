@@ -699,6 +699,566 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   );
 };
 
+// ─── LineItemSearchFields ─────────────────────────────────────────────────────
+
+interface LineItemSearchFieldsProps {
+  onPopulate: (data: {
+    item_no: string;
+    lot_no: string;
+    unit_price: number | null;
+  }) => void;
+}
+
+const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
+  onPopulate,
+}) => {
+  const [itemSearchTerm, setItemSearchTerm] = useState("");
+  const [debouncedItemSearch, setDebouncedItemSearch] = useState("");
+  const [showItemDropdown, setShowItemDropdown] = useState(false);
+
+  const [lotSearchTerm, setLotSearchTerm] = useState("");
+  const [debouncedLotSearch, setDebouncedLotSearch] = useState("");
+  const [showLotDropdown, setShowLotDropdown] = useState(false);
+
+  const [pendingItemNo, setPendingItemNo] = useState<string | null>(null);
+  const [pendingLotNo, setPendingLotNo] = useState<string | null>(null);
+  const [pendingPrice, setPendingPrice] = useState<number | null>(null);
+
+  const itemRef = useRef<HTMLDivElement>(null);
+  const lotRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedItemSearch(itemSearchTerm.trim()), 400);
+    return () => clearTimeout(t);
+  }, [itemSearchTerm]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedLotSearch(lotSearchTerm.trim()), 400);
+    return () => clearTimeout(t);
+  }, [lotSearchTerm]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (itemRef.current && !itemRef.current.contains(e.target as Node))
+        setShowItemDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (lotRef.current && !lotRef.current.contains(e.target as Node))
+        setShowLotDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Search items by sku
+  const { data: itemSearchData, isFetching: isItemSearching } =
+    useGetTouchupsQuery(
+      { sku: debouncedItemSearch, isFromProps: false, page_size: 50 },
+      { skip: debouncedItemSearch.length < 2 || !!pendingItemNo },
+    );
+
+  // Search lots by lot_no
+  const { data: lotSearchData, isFetching: isLotSearching } =
+    useGetTouchupsQuery(
+      { lot_no: debouncedLotSearch, isFromProps: false, page_size: 50 },
+      { skip: debouncedLotSearch.length < 2 || !!pendingLotNo },
+    );
+
+  // Get available lots for a selected item
+  const { data: lotsForItemData, isFetching: isFetchingLotsForItem } =
+    useGetTouchupsQuery(
+      { sku: pendingItemNo!, isFromProps: true, page_size: 100 },
+      { skip: !pendingItemNo || !!pendingLotNo },
+    );
+
+  // Get available items for a selected lot
+  const { data: itemsForLotData, isFetching: isFetchingItemsForLot } =
+    useGetTouchupsQuery(
+      { lot_no: pendingLotNo!, isFromProps: true, page_size: 100 },
+      { skip: !pendingLotNo || !!pendingItemNo },
+    );
+
+  const dedupeBy = <T,>(arr: T[], key: (v: T) => string): T[] =>
+    Array.from(new Map(arr.map((v) => [key(v), v] as [string, T])).values());
+
+  const itemSearchResults = dedupeBy<{ item_no: string; price: number | null }>(
+    (itemSearchData?.data ?? [])
+      .filter((r: any) => r.sku)
+      .map((r: any) => ({
+        item_no: r.sku as string,
+        price: r.unit_price != null ? Number(r.unit_price) : null,
+      })),
+    (r) => r.item_no,
+  );
+
+  const lotSearchResults = dedupeBy<{ lot_no: string }>(
+    (lotSearchData?.data ?? [])
+      .filter((r: any) => r.lot_no)
+      .map((r: any) => ({ lot_no: r.lot_no as string })),
+    (r) => r.lot_no,
+  );
+
+  const lotsForItem = dedupeBy<{ lot_no: string }>(
+    (lotsForItemData?.data ?? [])
+      .filter((r: any) => r.lot_no)
+      .map((r: any) => ({ lot_no: r.lot_no as string })),
+    (r) => r.lot_no,
+  );
+
+  const itemsForLot = dedupeBy<{ item_no: string; price: number | null }>(
+    (itemsForLotData?.data ?? [])
+      .filter((r: any) => r.sku)
+      .map((r: any) => ({
+        item_no: r.sku as string,
+        price: r.unit_price != null ? Number(r.unit_price) : null,
+      })),
+    (r) => r.item_no,
+  );
+
+  const absDropdown: React.CSSProperties = {
+    position: "absolute",
+    zIndex: 999,
+    background: "#fff",
+    border: "1.5px solid #e5e7eb",
+    borderRadius: "8px",
+    top: "calc(100% + 4px)",
+    left: 0,
+    right: 0,
+    boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+  };
+
+  const listBox: React.CSSProperties = {
+    border: "1.5px solid #e5e7eb",
+    borderRadius: "8px",
+    maxHeight: "120px",
+    overflowY: "auto",
+    background: "#fff",
+  };
+
+  const rowStyle: React.CSSProperties = {
+    padding: "6px 10px",
+    cursor: "pointer",
+    fontSize: "12px",
+    color: "#111827",
+    borderBottom: "1px solid #f3f4f6",
+  };
+
+  const loadingCell: React.CSSProperties = {
+    padding: "8px 12px",
+    border: "1.5px solid #e5e7eb",
+    borderRadius: "8px",
+    fontSize: "12px",
+    color: "#9ca3af",
+    background: "#f9fafb",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+  };
+
+  const emptyCell = (msg: string, warn = false): React.ReactNode => (
+    <div
+      style={{
+        padding: "8px 12px",
+        border: `1.5px solid ${warn ? "#f59e0b" : "#e5e7eb"}`,
+        borderRadius: "8px",
+        fontSize: "12px",
+        color: warn ? "#b45309" : "#9ca3af",
+        background: warn ? "#fffbeb" : "#f9fafb",
+      }}
+    >
+      {msg}
+    </div>
+  );
+
+  // ── Column 1: Item No ──────────────────────────────────────────────────────
+  const renderItemCol = () => {
+    const label = (
+      <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}>
+        Item No
+      </span>
+    );
+
+    // Already selected
+    if (pendingItemNo) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          {label}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "8px 12px",
+              border: "1.5px solid #e5e7eb",
+              borderRadius: "8px",
+              fontSize: "13px",
+              color: "#111827",
+              background: "#f9fafb",
+              gap: "6px",
+            }}
+          >
+            <span style={{ flex: 1 }}>{pendingItemNo}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setPendingItemNo(null);
+                setPendingPrice(null);
+                setItemSearchTerm("");
+                setDebouncedItemSearch("");
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                fontSize: "14px",
+                lineHeight: 1,
+                padding: 0,
+              }}
+              title="Clear item"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Lot was picked first — show items for that lot
+    if (pendingLotNo) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          {label}
+          {isFetchingItemsForLot ? (
+            <div style={loadingCell}>
+              <CircularProgress size={12} /> Loading…
+            </div>
+          ) : itemsForLot.length === 0 ? (
+            emptyCell("No items available", true)
+          ) : (
+            <div style={listBox}>
+              {itemsForLot.map((r) => (
+                <div
+                  key={r.item_no}
+                  onClick={() =>
+                    onPopulate({
+                      item_no: r.item_no,
+                      lot_no: pendingLotNo,
+                      unit_price: r.price,
+                    })
+                  }
+                  style={rowStyle}
+                  onMouseEnter={(e) =>
+                    ((e.currentTarget as HTMLDivElement).style.background =
+                      "#f5f3ff")
+                  }
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLDivElement).style.background =
+                      "transparent")
+                  }
+                >
+                  <strong>{r.item_no}</strong>
+                  {r.price != null && (
+                    <span style={{ marginLeft: "8px", color: "#6b7280" }}>
+                      — ${r.price}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Default: search input
+    return (
+      <div
+        ref={itemRef}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+          position: "relative",
+        }}
+      >
+        {label}
+        <div style={{ position: "relative" }}>
+          <input
+            type="text"
+            value={itemSearchTerm}
+            onChange={(e) => {
+              setItemSearchTerm(e.target.value);
+              setShowItemDropdown(true);
+            }}
+            onFocus={() => {
+              if (debouncedItemSearch.length >= 2) setShowItemDropdown(true);
+            }}
+            placeholder="Type item no…"
+            style={{ ...inputStyle, fontSize: "13px", padding: "8px 12px" }}
+          />
+          {isItemSearching && (
+            <CircularProgress
+              size={12}
+              style={{
+                position: "absolute",
+                right: "8px",
+                top: "50%",
+                transform: "translateY(-50%)",
+              }}
+            />
+          )}
+        </div>
+        {showItemDropdown &&
+          debouncedItemSearch.length >= 2 &&
+          !isItemSearching &&
+          itemSearchResults.length === 0 && (
+            <div
+              style={{
+                ...absDropdown,
+                padding: "10px 12px",
+                fontSize: "12px",
+                color: "#9ca3af",
+              }}
+            >
+              No items found
+            </div>
+          )}
+        {showItemDropdown && itemSearchResults.length > 0 && (
+          <div style={{ ...absDropdown, maxHeight: "160px", overflowY: "auto" }}>
+            {itemSearchResults.map((r) => (
+              <div
+                key={r.item_no}
+                onClick={() => {
+                  setPendingItemNo(r.item_no);
+                  setPendingPrice(r.price);
+                  setItemSearchTerm(r.item_no);
+                  setShowItemDropdown(false);
+                }}
+                style={{
+                  padding: "8px 12px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  color: "#111827",
+                  borderBottom: "1px solid #f3f4f6",
+                }}
+                onMouseEnter={(e) =>
+                  ((e.currentTarget as HTMLDivElement).style.background =
+                    "#f5f3ff")
+                }
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLDivElement).style.background =
+                    "transparent")
+                }
+              >
+                <strong>{r.item_no}</strong>
+                {r.price != null && (
+                  <span style={{ marginLeft: "8px", color: "#6b7280" }}>
+                    — ${r.price}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Column 2: Lot No ───────────────────────────────────────────────────────
+  const renderLotCol = () => {
+    const label = (
+      <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}>
+        Lot No
+      </span>
+    );
+
+    // Already selected
+    if (pendingLotNo) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          {label}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              padding: "8px 12px",
+              border: "1.5px solid #e5e7eb",
+              borderRadius: "8px",
+              fontSize: "13px",
+              color: "#111827",
+              background: "#f9fafb",
+              gap: "6px",
+            }}
+          >
+            <span style={{ flex: 1 }}>{pendingLotNo}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setPendingLotNo(null);
+                setLotSearchTerm("");
+                setDebouncedLotSearch("");
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#9ca3af",
+                fontSize: "14px",
+                lineHeight: 1,
+                padding: 0,
+              }}
+              title="Clear lot"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Item was picked first — show lots for that item
+    if (pendingItemNo) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          {label}
+          {isFetchingLotsForItem ? (
+            <div style={loadingCell}>
+              <CircularProgress size={12} /> Loading…
+            </div>
+          ) : lotsForItem.length === 0 ? (
+            emptyCell("No lots available", true)
+          ) : (
+            <div style={listBox}>
+              {lotsForItem.map((r) => (
+                <div
+                  key={r.lot_no}
+                  onClick={() =>
+                    onPopulate({
+                      item_no: pendingItemNo,
+                      lot_no: r.lot_no,
+                      unit_price: pendingPrice,
+                    })
+                  }
+                  style={rowStyle}
+                  onMouseEnter={(e) =>
+                    ((e.currentTarget as HTMLDivElement).style.background =
+                      "#f0fdf4")
+                  }
+                  onMouseLeave={(e) =>
+                    ((e.currentTarget as HTMLDivElement).style.background =
+                      "transparent")
+                  }
+                >
+                  {r.lot_no}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Default: search input
+    return (
+      <div
+        ref={lotRef}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+          position: "relative",
+        }}
+      >
+        {label}
+        <div style={{ position: "relative" }}>
+          <input
+            type="text"
+            value={lotSearchTerm}
+            onChange={(e) => {
+              setLotSearchTerm(e.target.value);
+              setShowLotDropdown(true);
+            }}
+            onFocus={() => {
+              if (debouncedLotSearch.length >= 2) setShowLotDropdown(true);
+            }}
+            placeholder="Type lot no…"
+            style={{ ...inputStyle, fontSize: "13px", padding: "8px 12px" }}
+          />
+          {isLotSearching && (
+            <CircularProgress
+              size={12}
+              style={{
+                position: "absolute",
+                right: "8px",
+                top: "50%",
+                transform: "translateY(-50%)",
+              }}
+            />
+          )}
+        </div>
+        {showLotDropdown &&
+          debouncedLotSearch.length >= 2 &&
+          !isLotSearching &&
+          lotSearchResults.length === 0 && (
+            <div
+              style={{
+                ...absDropdown,
+                padding: "10px 12px",
+                fontSize: "12px",
+                color: "#9ca3af",
+              }}
+            >
+              No lots found
+            </div>
+          )}
+        {showLotDropdown && lotSearchResults.length > 0 && (
+          <div style={{ ...absDropdown, maxHeight: "160px", overflowY: "auto" }}>
+            {lotSearchResults.map((r) => (
+              <div
+                key={r.lot_no}
+                onClick={() => {
+                  setPendingLotNo(r.lot_no);
+                  setLotSearchTerm(r.lot_no);
+                  setShowLotDropdown(false);
+                }}
+                style={{
+                  padding: "8px 12px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  color: "#111827",
+                  borderBottom: "1px solid #f3f4f6",
+                }}
+                onMouseEnter={(e) =>
+                  ((e.currentTarget as HTMLDivElement).style.background =
+                    "#f0fdf4")
+                }
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLDivElement).style.background =
+                    "transparent")
+                }
+              >
+                {r.lot_no}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      {renderItemCol()}
+      {renderLotCol()}
+    </>
+  );
+};
+
 // ─── PartsSubSection ─────────────────────────────────────────────────────────
 
 type PartRow = {
@@ -1619,41 +2179,6 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
   lineReasonCodeOptions,
   washWholeUnit = false,
 }) => {
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [showResults, setShowResults] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(item.title.trim()), 400);
-    return () => clearTimeout(t);
-  }, [item.title]);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node))
-        setShowResults(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const { data: searchData, isFetching } = useGetDistinctTouchupItemsQuery(
-    { parts_item_no: `like:${debouncedSearch}`, page_size: 50 },
-    { skip: debouncedSearch.length < 2 },
-  );
-
-  const results: { item_no: string; price: number | null }[] = (
-    searchData?.data ?? []
-  ).map((p: any) => ({
-    item_no: p.parts_item_no,
-    price: p.unit_price != null ? Number(p.unit_price) : null,
-  }));
-
-  const handleSelect = (item_no: string, price: number | null) => {
-    onUpdate({ title: item_no, price: price != null ? String(price) : "" });
-    setShowResults(false);
-  };
-
   const lineAmount =
     item.price !== "" && !isNaN(parseFloat(item.price))
       ? (parseFloat(item.price) * item.quantity).toFixed(2)
@@ -1717,49 +2242,87 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
           gap: "10px",
         }}
       >
-        {/* Item No (read-only) */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "4px",
-          }}
-        >
-          <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}>
-            Item No
-          </span>
-          <div
-            style={{
-              padding: "8px 12px",
-              border: "1.5px solid #e5e7eb",
-              borderRadius: "8px",
-              fontSize: "13px",
-              color: item.title ? "#111827" : "#9ca3af",
-              background: "#f9fafb",
-            }}
-          >
-            {item.title || "—"}
-          </div>
-        </div>
+        {item.title ? (
+          <>
+            {/* Item No (read-only after selection) */}
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "4px" }}
+            >
+              <span
+                style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}
+              >
+                Item No
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "8px 12px",
+                  border: "1.5px solid #e5e7eb",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  color: "#111827",
+                  background: "#f9fafb",
+                  gap: "6px",
+                }}
+              >
+                <span style={{ flex: 1 }}>{item.title}</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdate({ title: "", lot_no: "", price: "" })
+                  }
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: "#9ca3af",
+                    fontSize: "14px",
+                    lineHeight: 1,
+                    padding: 0,
+                  }}
+                  title="Clear item / lot"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
 
-        {/* Lot No (read-only) */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          <span style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}>
-            Lot No
-          </span>
-          <div
-            style={{
-              padding: "8px 12px",
-              border: "1.5px solid #e5e7eb",
-              borderRadius: "8px",
-              fontSize: "13px",
-              color: item.lot_no ? "#111827" : "#9ca3af",
-              background: "#f9fafb",
+            {/* Lot No (read-only after selection) */}
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "4px" }}
+            >
+              <span
+                style={{ fontSize: "11px", fontWeight: 600, color: "#6b7280" }}
+              >
+                Lot No
+              </span>
+              <div
+                style={{
+                  padding: "8px 12px",
+                  border: "1.5px solid #e5e7eb",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  color: item.lot_no ? "#111827" : "#9ca3af",
+                  background: "#f9fafb",
+                }}
+              >
+                {item.lot_no || "—"}
+              </div>
+            </div>
+          </>
+        ) : (
+          <LineItemSearchFields
+            onPopulate={({ item_no, lot_no, unit_price }) => {
+              onUpdate({
+                title: item_no,
+                lot_no,
+                price: unit_price != null ? String(unit_price) : "",
+                quantity: 1,
+              });
             }}
-          >
-            {item.lot_no || "—"}
-          </div>
-        </div>
+          />
+        )}
 
         {/* Unit Price */}
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -1785,7 +2348,7 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
                     cursor: "not-allowed",
                   }
                 : item.price === "" || Number(item.price) === 0
-                  ? { borderColor: "#f59e0b", background: "#fffbeb" }
+                  ? { border: "1.5px solid #f59e0b", background: "#fffbeb" }
                   : {}),
             }}
           />
@@ -2020,6 +2583,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   // ── Reason code ───────────────────────────────────────────────────────────
   const [selectedReasonCode, setSelectedReasonCode] = useState("");
+  const [selectedExternalDocInfo, setSelectedExternalDocInfo] = useState("");
   const [washWholeUnit, setWashWholeUnit] = useState(false);
   const { data: returnReasonsData } = useGetShopifyReturnReasonsCodeQuery();
 
@@ -2337,11 +2901,15 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     );
     setDraftNewItems([]);
     setDraftNewCustomItems([]);
-    // Pre-populate order-level reason_code and status from the fetched draft order
+    // Pre-populate order-level reason_code, external_doc_info and status from the fetched draft order
     const existingReasonCode =
       draftLineItemsData.customAttributes?.find((a) => a.key === "reason_code")
         ?.value ?? "";
     setDraftEditReasonCode(existingReasonCode);
+    const existingExternDocInfo =
+      draftLineItemsData.customAttributes?.find((a) => a.key === "external_doc_info")
+        ?.value ?? "";
+    setDraftEditExternalDocInfo(existingExternDocInfo);
     if (draftLineItemsData.status) {
       setDraftOrderStatus(draftLineItemsData.status);
     }
@@ -2385,6 +2953,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   const [staffNote, setStaffNote] = useState("");
   const [draftOrderStatus, setDraftOrderStatus] = useState<string | null>(null);
   const [draftEditReasonCode, setDraftEditReasonCode] = useState("");
+  const [draftEditExternalDocInfo, setDraftEditExternalDocInfo] = useState("");
   const [draftWashWholeUnit, setDraftWashWholeUnit] = useState(false);
 
   // Reset edit state when switching modes
@@ -2601,6 +3170,35 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     setForm((prev) => ({ ...prev, [type]: { ...prev[type], [field]: value } }));
   };
 
+  const zipLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleShippingZipChange = (zip: string) => {
+    handleAddressChange("shippingAddress", "zip", zip);
+    if (zipLookupRef.current) clearTimeout(zipLookupRef.current);
+    if (!zip || zip.length < 3) return;
+    zipLookupRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://api.zippopotam.us/us/${zip}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const place = data?.places?.[0];
+        if (!place) return;
+        const stateAbbr: string = place["state abbreviation"] ?? "";
+        const country: string = data["country abbreviation"] ?? "US";
+        setForm((prev) => ({
+          ...prev,
+          shippingAddress: {
+            ...prev.shippingAddress,
+            ...(stateAbbr ? { provinceCode: stateAbbr } : {}),
+            countryCode: country,
+          },
+        }));
+      } catch {
+        // silently ignore lookup failures
+      }
+    }, 500);
+  };
+
   const handleLineItemChange = <K extends keyof LineItem>(
     index: number,
     field: K,
@@ -2634,6 +3232,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       });
     if (selectedReasonCode)
       props.push({ name: "reason_code", value: selectedReasonCode });
+    if (selectedExternalDocInfo.trim())
+      props.push({ name: "external_doc_info", value: selectedExternalDocInfo.trim() });
     return props;
   };
 
@@ -2793,14 +3393,18 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     }
     try {
       const body = buildEditBody();
-      // Attach reason_code at order level if set; backend merges with existing customAttributes
-      if (draftEditReasonCode.trim()) {
+      // Attach order-level attrs; backend merges with existing customAttributes
+      if (draftEditReasonCode.trim() || draftEditExternalDocInfo.trim()) {
         const existingAttrs =
           (body.customAttributes as { key: string; value: string }[]) ?? [];
-        body.customAttributes = [
-          ...existingAttrs.filter((a) => a.key !== "reason_code"),
-          { key: "reason_code", value: draftEditReasonCode.trim() },
-        ];
+        const filtered = existingAttrs.filter(
+          (a) => a.key !== "reason_code" && a.key !== "external_doc_info",
+        );
+        if (draftEditReasonCode.trim())
+          filtered.push({ key: "reason_code", value: draftEditReasonCode.trim() });
+        if (draftEditExternalDocInfo.trim())
+          filtered.push({ key: "external_doc_info", value: draftEditExternalDocInfo.trim() });
+        body.customAttributes = filtered;
       }
       await updateDraftOrder({
         draftOrderId: editDraftOrderId.trim(),
@@ -3251,7 +3855,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   style={{
                     ...inputStyle,
                     paddingLeft: "40px",
-                    borderColor: showOrderDropdown ? "#6366f1" : "#e5e7eb",
+                    border: showOrderDropdown ? "1.5px solid #6366f1" : "1.5px solid #e5e7eb",
                   }}
                 />
                 <span
@@ -3423,6 +4027,21 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 onChange={setSelectedReasonCode}
                 options={reasonCodeOptions}
                 placeholder="— select reason code —"
+              />
+            </div>
+            <div style={fieldWrap}>
+              <label style={labelStyle}>
+                External Doc Info{" "}
+                <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+                  (order level)
+                </span>
+              </label>
+              <input
+                style={inputStyle}
+                type="text"
+                placeholder="e.g. INV-1234"
+                value={selectedExternalDocInfo}
+                onChange={(e) => setSelectedExternalDocInfo(e.target.value)}
               />
             </div>
             <div
@@ -3744,64 +4363,114 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     gap: "10px",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        color: "#6b7280",
+                  {item.item_no ? (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            color: "#6b7280",
+                          }}
+                        >
+                          Item No
+                        </span>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            padding: "8px 12px",
+                            border: "1.5px solid #e5e7eb",
+                            borderRadius: "8px",
+                            fontSize: "13px",
+                            color: "#111827",
+                            background: "#f9fafb",
+                            gap: "6px",
+                          }}
+                        >
+                          <span style={{ flex: 1 }}>{item.item_no}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setForm((prev) => {
+                                const updated = [...prev.lineItems];
+                                updated[index] = {
+                                  ...updated[index],
+                                  item_no: undefined,
+                                  lot_no: null,
+                                  unit_price: null,
+                                };
+                                return { ...prev, lineItems: updated };
+                              })
+                            }
+                            style={{
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              color: "#9ca3af",
+                              fontSize: "14px",
+                              lineHeight: 1,
+                              padding: 0,
+                            }}
+                            title="Clear item / lot"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            color: "#6b7280",
+                          }}
+                        >
+                          Lot No
+                        </span>
+                        <div
+                          style={{
+                            padding: "8px 12px",
+                            border: "1.5px solid #e5e7eb",
+                            borderRadius: "8px",
+                            fontSize: "13px",
+                            color: item.lot_no ? "#111827" : "#9ca3af",
+                            background: "#f9fafb",
+                          }}
+                        >
+                          {item.lot_no ?? "—"}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <LineItemSearchFields
+                      onPopulate={({ item_no, lot_no, unit_price }) => {
+                        setForm((prev) => {
+                          const newLineItems = [...prev.lineItems];
+                          newLineItems[index] = {
+                            ...newLineItems[index],
+                            item_no,
+                            lot_no,
+                            unit_price: unit_price ?? null,
+                            quantity: 1,
+                          };
+                          return { ...prev, lineItems: newLineItems };
+                        });
                       }}
-                    >
-                      Item No
-                    </span>
-                    <div
-                      style={{
-                        padding: "8px 12px",
-                        border: "1.5px solid #e5e7eb",
-                        borderRadius: "8px",
-                        fontSize: "13px",
-                        color: item.item_no ? "#111827" : "#9ca3af",
-                        background: "#f9fafb",
-                      }}
-                    >
-                      {item.item_no ?? "—"}
-                    </div>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "4px",
-                    }}
-                  >
-                    <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        color: "#6b7280",
-                      }}
-                    >
-                      Lot No
-                    </span>
-                    <div
-                      style={{
-                        padding: "8px 12px",
-                        border: "1.5px solid #e5e7eb",
-                        borderRadius: "8px",
-                        fontSize: "13px",
-                        color: item.lot_no ? "#111827" : "#9ca3af",
-                        background: "#f9fafb",
-                      }}
-                    >
-                      {item.lot_no ?? "—"}
-                    </div>
-                  </div>
+                    />
+                  )}
                   <div
                     style={{
                       display: "flex",
@@ -3845,7 +4514,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                             }
                           : item.unit_price == null ||
                               Number(item.unit_price) === 0
-                            ? { borderColor: "#f59e0b", background: "#fffbeb" }
+                            ? { border: "1.5px solid #f59e0b", background: "#fffbeb" }
                             : {}),
                       }}
                     />
@@ -4105,13 +4774,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   placeholder="e.g., 10001"
                   value={addr.zip}
                   required
-                  onChange={(e) =>
-                    handleAddressChange(
-                      "shippingAddress",
-                      "zip",
-                      e.target.value,
-                    )
-                  }
+                  onChange={(e) => handleShippingZipChange(e.target.value)}
                 />
               </div>
               <div style={fieldWrap}>
@@ -5615,6 +6278,38 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 )}
               </div>
 
+              {/* External Doc Info */}
+              <div style={{ marginBottom: "20px" }}>
+                <label style={labelStyle}>
+                  External Doc Info{" "}
+                  <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+                    (order level)
+                  </span>
+                </label>
+                {draftOrderStatus === "COMPLETED" ? (
+                  <div
+                    style={{
+                      padding: "10px 14px",
+                      background: "#fef3c7",
+                      border: "1px solid #fcd34d",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      color: "#92400e",
+                    }}
+                  >
+                    This draft order is completed and cannot be updated.
+                  </div>
+                ) : (
+                  <input
+                    style={inputStyle}
+                    type="text"
+                    placeholder="e.g. INV-1234"
+                    value={draftEditExternalDocInfo}
+                    onChange={(e) => setDraftEditExternalDocInfo(e.target.value)}
+                  />
+                )}
+              </div>
+
               {/* Shipping Address */}
               <div
                 style={{
@@ -5817,9 +6512,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                       style={{
                         ...inputStyle,
                         paddingLeft: "40px",
-                        borderColor: showDraftImportDropdown
-                          ? "#6366f1"
-                          : "#e5e7eb",
+                        border: showDraftImportDropdown
+                          ? "1.5px solid #6366f1"
+                          : "1.5px solid #e5e7eb",
                       }}
                     />
                     <span
