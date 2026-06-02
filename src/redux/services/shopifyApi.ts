@@ -138,6 +138,7 @@ export const shopifyApi = createApi({
         email: string;
         note?: string;
         tags?: string[];
+        washWholeUnit?: boolean;
         lineItems: {
           variantId?: string;
           quantity: number;
@@ -166,6 +167,7 @@ export const shopifyApi = createApi({
         email,
         note,
         tags = [],
+        washWholeUnit = false,
         lineItems,
         shippingAddress,
       }) => ({
@@ -176,6 +178,7 @@ export const shopifyApi = createApi({
             email,
             note,
             tags,
+            washWholeUnit,
             lineItems,
             shippingAddress,
           },
@@ -411,6 +414,51 @@ export const shopifyApi = createApi({
       }),
     }),
 
+    cancelOrder: builder.mutation<
+      any,
+      {
+        orderId: string;
+        store?: ShopifyStore;
+        reason?: string;
+        refund?: boolean;
+        restock?: boolean;
+      }
+    >({
+      query: ({ orderId, store = "store1", reason = "CUSTOMER", refund = false, restock = true }) => ({
+        url: `/shopify/order/${orderId}/cancel?store=${store}`,
+        method: "POST",
+        body: { reason, refund, restock },
+      }),
+    }),
+
+    getOrderEditEligibility: builder.query<
+      {
+        canEdit: boolean;
+        reason: string | null;
+        remainingMinutes: number | null;
+        order: {
+          id: string;
+          name: string;
+          createdAt: string;
+          cancelledAt: string | null;
+          closedAt: string | null;
+          displayFulfillmentStatus: string;
+        } | null;
+      },
+      { orderId: string; store?: ShopifyStore }
+    >({
+      query: ({ orderId, store = "store1" }) => ({
+        url: `/shopify/order/${orderId}/edit-eligibility?store=${store}`,
+        method: "GET",
+      }),
+      transformResponse: (response: any) => ({
+        canEdit: response.canEdit,
+        reason: response.reason ?? null,
+        remainingMinutes: response.remainingMinutes ?? null,
+        order: response.order ?? null,
+      }),
+    }),
+
     getShopifyOrders: builder.query<
       {
         data: ShopifyOrder[];
@@ -519,6 +567,8 @@ export const {
   useGetOrderLineItemsQuery,
   useGetDraftOrderLineItemsQuery,
   useEditOrderMutation,
+  useCancelOrderMutation,
+  useGetOrderEditEligibilityQuery,
   useGetShopifyOrdersQuery,
   useGetShopifyDraftOrdersQuery,
   useGetShopifyReturnReasonsQuery,

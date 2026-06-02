@@ -15,6 +15,8 @@ import {
   useGetShopifyDraftOrdersQuery,
   useGetShopifyReturnReasonsQuery,
   useGetShopifyReturnReasonsCodeQuery,
+  useGetOrderEditEligibilityQuery,
+  useCancelOrderMutation,
   type ProductVariant,
   type ShopifyProduct,
   type ShopifyStore,
@@ -77,7 +79,7 @@ interface OrderFormState {
   email: string;
   lineItems: LineItem[];
   shippingAddress: Address;
-  billingAddress: Address;
+  // billingAddress: Address;
 }
 
 interface CustomAttribute {
@@ -86,7 +88,7 @@ interface CustomAttribute {
 }
 
 type FormMode = "create" | "editOrder" | "editDraft" | "createProduct";
-type EditSubTab = "details" | "lineItems";
+type EditSubTab = "details" | "lineItems" | "cancel";
 type DraftSubTab = "details" | "lineItems";
 type OpType = "addVariant" | "setQuantity" | "addDiscount" | "addCustomItem";
 
@@ -728,12 +730,18 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
   const lotRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedItemSearch(itemSearchTerm.trim()), 400);
+    const t = setTimeout(
+      () => setDebouncedItemSearch(itemSearchTerm.trim()),
+      400,
+    );
     return () => clearTimeout(t);
   }, [itemSearchTerm]);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedLotSearch(lotSearchTerm.trim()), 400);
+    const t = setTimeout(
+      () => setDebouncedLotSearch(lotSearchTerm.trim()),
+      400,
+    );
     return () => clearTimeout(t);
   }, [lotSearchTerm]);
 
@@ -1029,7 +1037,9 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
             </div>
           )}
         {showItemDropdown && itemSearchResults.length > 0 && (
-          <div style={{ ...absDropdown, maxHeight: "160px", overflowY: "auto" }}>
+          <div
+            style={{ ...absDropdown, maxHeight: "160px", overflowY: "auto" }}
+          >
             {itemSearchResults.map((r) => (
               <div
                 key={r.item_no}
@@ -1217,7 +1227,9 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
             </div>
           )}
         {showLotDropdown && lotSearchResults.length > 0 && (
-          <div style={{ ...absDropdown, maxHeight: "160px", overflowY: "auto" }}>
+          <div
+            style={{ ...absDropdown, maxHeight: "160px", overflowY: "auto" }}
+          >
             {lotSearchResults.map((r) => (
               <div
                 key={r.lot_no}
@@ -2269,9 +2281,7 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
                 <span style={{ flex: 1 }}>{item.title}</span>
                 <button
                   type="button"
-                  onClick={() =>
-                    onUpdate({ title: "", lot_no: "", price: "" })
-                  }
+                  onClick={() => onUpdate({ title: "", lot_no: "", price: "" })}
                   style={{
                     background: "none",
                     border: "none",
@@ -2655,7 +2665,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     email: "",
     lineItems: [{ variantId: "", quantity: 1 }],
     shippingAddress: { ...defaultAddress },
-    billingAddress: { ...defaultAddress },
+    // billingAddress: { ...defaultAddress },
   });
 
   // ── Edit mode: order search ───────────────────────────────────────────────
@@ -2789,6 +2799,15 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       reset: resetEditOrder,
     },
   ] = useEditOrderMutation();
+  const [
+    cancelOrderMutation,
+    {
+      isLoading: isCancelling,
+      data: cancelData,
+      error: cancelError,
+      reset: resetCancel,
+    },
+  ] = useCancelOrderMutation();
 
   // Load existing line items for the order being edited
   const [loadLineItemsOrderId, setLoadLineItemsOrderId] = useState<string>("");
@@ -2903,12 +2922,14 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     setDraftNewCustomItems([]);
     // Pre-populate order-level reason_code, external_doc_info and status from the fetched draft order
     const existingReasonCode =
-      draftLineItemsData.customAttributes?.find((a) => a.key === "reason_code")
-        ?.value ?? "";
+      draftLineItemsData.customAttributes?.find(
+        (a) => a.key === "CXI Reason Code" || a.key === "reason_code",
+      )?.value ?? "";
     setDraftEditReasonCode(existingReasonCode);
     const existingExternDocInfo =
-      draftLineItemsData.customAttributes?.find((a) => a.key === "external_doc_info")
-        ?.value ?? "";
+      draftLineItemsData.customAttributes?.find(
+        (a) => a.key === "Zendesk Ticket #" || a.key === "external_doc_info",
+      )?.value ?? "";
     setDraftEditExternalDocInfo(existingExternDocInfo);
     if (draftLineItemsData.status) {
       setDraftOrderStatus(draftLineItemsData.status);
@@ -2938,6 +2959,13 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   // ── Edit mode: state ──────────────────────────────────────────────────────
   const [editOrderId, setEditOrderId] = useState("");
   const [editDraftOrderId, setEditDraftOrderId] = useState("");
+
+  // ── Edit eligibility check ────────────────────────────────────────────────
+  const { data: editEligibility, isFetching: isCheckingEligibility } =
+    useGetOrderEditEligibilityQuery(
+      { orderId: editOrderId, store: selectedStore },
+      { skip: !editOrderId.trim() || mode !== "editOrder" },
+    );
   const [editSelectedOrder, setEditSelectedOrder] = useState<any>(null);
   const [removedLineItemIds, setRemovedLineItemIds] = useState<Set<string>>(
     new Set(),
@@ -2955,6 +2983,12 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   const [draftEditReasonCode, setDraftEditReasonCode] = useState("");
   const [draftEditExternalDocInfo, setDraftEditExternalDocInfo] = useState("");
   const [draftWashWholeUnit, setDraftWashWholeUnit] = useState(false);
+
+  // ── Cancel order state ────────────────────────────────────────────────────
+  const [cancelReason, setCancelReason] = useState("CUSTOMER");
+  const [cancelRefund, setCancelRefund] = useState(false);
+  const [cancelRestock, setCancelRestock] = useState(true);
+  const [cancelConfirmed, setCancelConfirmed] = useState(false);
 
   // Reset edit state when switching modes
   useEffect(() => {
@@ -2985,6 +3019,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     setDraftOrderStatus(null);
     setDraftEditReasonCode("");
     setDraftWashWholeUnit(false);
+    setCancelReason("CUSTOMER");
+    setCancelRefund(false);
+    setCancelRestock(true);
+    setCancelConfirmed(false);
+    resetCancel();
     resetEditOrder();
   }, [mode]); // Reset all form state when store changes
   useEffect(() => {
@@ -3163,7 +3202,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   };
 
   const handleAddressChange = (
-    type: "shippingAddress" | "billingAddress",
+    type: "shippingAddress",
     field: keyof Address,
     value: string,
   ) => {
@@ -3184,12 +3223,14 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         const place = data?.places?.[0];
         if (!place) return;
         const stateAbbr: string = place["state abbreviation"] ?? "";
+        const city: string = place["place name"] ?? "";
         const country: string = data["country abbreviation"] ?? "US";
         setForm((prev) => ({
           ...prev,
           shippingAddress: {
             ...prev.shippingAddress,
             ...(stateAbbr ? { provinceCode: stateAbbr } : {}),
+            ...(city ? { city } : {}),
             countryCode: country,
           },
         }));
@@ -3233,7 +3274,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     if (selectedReasonCode)
       props.push({ name: "reason_code", value: selectedReasonCode });
     if (selectedExternalDocInfo.trim())
-      props.push({ name: "external_doc_info", value: selectedExternalDocInfo.trim() });
+      props.push({
+        name: "external_doc_info",
+        value: selectedExternalDocInfo.trim(),
+      });
     return props;
   };
 
@@ -3315,10 +3359,14 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       //   }).unwrap();
       //   toast.success("Order created successfully!");
       // } else {
+      const draftTags = washWholeUnit
+        ? [selectedTag, "cxi-washwholeunit"]
+        : [selectedTag];
       await createDraftOrder({
         store: selectedStore,
         email: form.email,
-        tags: [selectedTag],
+        tags: draftTags,
+        washWholeUnit,
         lineItems: buildLineItemsPayload(form.lineItems),
         shippingAddress: form.shippingAddress,
       }).unwrap();
@@ -3401,9 +3449,15 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
           (a) => a.key !== "reason_code" && a.key !== "external_doc_info",
         );
         if (draftEditReasonCode.trim())
-          filtered.push({ key: "reason_code", value: draftEditReasonCode.trim() });
+          filtered.push({
+            key: "reason_code",
+            value: draftEditReasonCode.trim(),
+          });
         if (draftEditExternalDocInfo.trim())
-          filtered.push({ key: "external_doc_info", value: draftEditExternalDocInfo.trim() });
+          filtered.push({
+            key: "external_doc_info",
+            value: draftEditExternalDocInfo.trim(),
+          });
         body.customAttributes = filtered;
       }
       await updateDraftOrder({
@@ -3622,6 +3676,31 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     }
   };
 
+  const handleCancelOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editOrderId.trim()) {
+      toast.error("Please select an order first.");
+      return;
+    }
+    if (!cancelConfirmed) {
+      toast.error("Please check the confirmation box before cancelling.");
+      return;
+    }
+    try {
+      await cancelOrderMutation({
+        orderId: editOrderId.trim(),
+        store: selectedStore,
+        reason: cancelReason,
+        refund: cancelRefund,
+        restock: cancelRestock,
+      }).unwrap();
+      setCancelConfirmed(false);
+      toast.success("Order cancelled successfully!");
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   // ── Shared address fields renderer ────────────────────────────────────────
   const addr = form.shippingAddress;
 
@@ -3810,7 +3889,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
           {(
             [
               { key: "create", label: "Create Order" },
-              // { key: "editOrder", label: "Edit Order" },
+              { key: "editOrder", label: "Edit Order" },
               { key: "editDraft", label: "Edit Draft" },
               // { key: "createProduct", label: "Create Product" },
             ] as { key: FormMode; label: string }[]
@@ -3855,7 +3934,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   style={{
                     ...inputStyle,
                     paddingLeft: "40px",
-                    border: showOrderDropdown ? "1.5px solid #6366f1" : "1.5px solid #e5e7eb",
+                    border: showOrderDropdown
+                      ? "1.5px solid #6366f1"
+                      : "1.5px solid #e5e7eb",
                   }}
                 />
                 <span
@@ -4031,7 +4112,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             </div>
             <div style={fieldWrap}>
               <label style={labelStyle}>
-                External Doc Info{" "}
+                Zendesk Ticket #{" "}
                 <span style={{ color: "#9ca3af", fontWeight: 400 }}>
                   (order level)
                 </span>
@@ -4514,7 +4595,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                             }
                           : item.unit_price == null ||
                               Number(item.unit_price) === 0
-                            ? { border: "1.5px solid #f59e0b", background: "#fffbeb" }
+                            ? {
+                                border: "1.5px solid #f59e0b",
+                                background: "#fffbeb",
+                              }
                             : {}),
                       }}
                     />
@@ -5079,6 +5163,67 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             </div>
           </div>
 
+          {/* ── Edit eligibility banner ── */}
+          {editOrderId.trim() && (
+            <div style={{ marginBottom: "20px" }}>
+              {isCheckingEligibility ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    background: "#f9fafb",
+                    border: "1px solid #e5e7eb",
+                    fontSize: "13px",
+                    color: "#6b7280",
+                  }}
+                >
+                  <CircularProgress size={13} />
+                  Checking edit eligibility…
+                </div>
+              ) : editEligibility && !editEligibility.canEdit ? (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    background: "#fef2f2",
+                    border: "1px solid #fca5a5",
+                    fontSize: "13px",
+                    color: "#dc2626",
+                    fontWeight: 500,
+                  }}
+                >
+                  {editEligibility.reason}
+                </div>
+              ) : editEligibility?.canEdit &&
+                editEligibility.remainingMinutes !== null ? (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "8px",
+                    background:
+                      (editEligibility.remainingMinutes ?? 90) < 10
+                        ? "#fffbeb"
+                        : "#f0fdf4",
+                    border: `1px solid ${(editEligibility.remainingMinutes ?? 90) < 10 ? "#fde68a" : "#86efac"}`,
+                    fontSize: "13px",
+                    color:
+                      (editEligibility.remainingMinutes ?? 90) < 10
+                        ? "#b45309"
+                        : "#15803d",
+                    fontWeight: 500,
+                  }}
+                >
+                  {(editEligibility.remainingMinutes ?? 90) < 10
+                    ? `Editing window closing — ${editEligibility.remainingMinutes} min remaining`
+                    : `Order editable — ${editEligibility.remainingMinutes} min remaining`}
+                </div>
+              ) : null}
+            </div>
+          )}
+
           {/* Sub-tabs */}
           <div
             style={{
@@ -5092,6 +5237,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               [
                 { key: "details", label: "Update Details" },
                 { key: "lineItems", label: "Edit Line Items" },
+                { key: "cancel", label: "Cancel Order" },
               ] as { key: EditSubTab; label: string }[]
             ).map(({ key, label }) => (
               <button
@@ -5297,16 +5443,33 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               >
                 <button
                   type="submit"
-                  disabled={isUpdating}
+                  disabled={
+                    isUpdating ||
+                    isCheckingEligibility ||
+                    editEligibility?.canEdit === false
+                  }
+                  title={
+                    editEligibility?.canEdit === false
+                      ? (editEligibility.reason ?? undefined)
+                      : undefined
+                  }
                   style={{
                     padding: "10px 28px",
                     border: "none",
                     borderRadius: "8px",
-                    background: isUpdating
-                      ? "#a5b4fc"
-                      : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                    background:
+                      isUpdating ||
+                      isCheckingEligibility ||
+                      editEligibility?.canEdit === false
+                        ? "#a5b4fc"
+                        : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
                     color: "#fff",
-                    cursor: isUpdating ? "not-allowed" : "pointer",
+                    cursor:
+                      isUpdating ||
+                      isCheckingEligibility ||
+                      editEligibility?.canEdit === false
+                        ? "not-allowed"
+                        : "pointer",
                     fontSize: "14px",
                     fontWeight: 700,
                   }}
@@ -6009,21 +6172,210 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               >
                 <button
                   type="submit"
-                  disabled={isEditing}
+                  disabled={
+                    isEditing ||
+                    isCheckingEligibility ||
+                    editEligibility?.canEdit === false
+                  }
+                  title={
+                    editEligibility?.canEdit === false
+                      ? (editEligibility.reason ?? undefined)
+                      : undefined
+                  }
                   style={{
                     padding: "10px 28px",
                     border: "none",
                     borderRadius: "8px",
-                    background: isEditing
-                      ? "#a5b4fc"
-                      : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
+                    background:
+                      isEditing ||
+                      isCheckingEligibility ||
+                      editEligibility?.canEdit === false
+                        ? "#a5b4fc"
+                        : "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
                     color: "#fff",
-                    cursor: isEditing ? "not-allowed" : "pointer",
+                    cursor:
+                      isEditing ||
+                      isCheckingEligibility ||
+                      editEligibility?.canEdit === false
+                        ? "not-allowed"
+                        : "pointer",
                     fontSize: "14px",
                     fontWeight: 700,
                   }}
                 >
                   {isEditing ? "Applying..." : "Apply Changes"}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ── Cancel Order sub-tab ── */}
+          {editSubTab === "cancel" && (
+            <form onSubmit={handleCancelOrder}>
+              {/* Eligibility block */}
+              {editEligibility?.canEdit === false && (
+                <div
+                  style={{
+                    marginBottom: "20px",
+                    padding: "12px 14px",
+                    borderRadius: "8px",
+                    background: "#fef2f2",
+                    border: "1px solid #fca5a5",
+                    fontSize: "13px",
+                    color: "#dc2626",
+                    fontWeight: 500,
+                  }}
+                >
+                  {editEligibility.reason}
+                </div>
+              )}
+
+              {/* Reason */}
+              <div style={{ ...fieldWrap, marginBottom: "20px" }}>
+                <label style={labelStyle}>Cancellation Reason</label>
+                <select
+                  style={{ ...inputStyle, background: "#fff" }}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  disabled={editEligibility?.canEdit === false}
+                >
+                  <option value="CUSTOMER">Customer</option>
+                  <option value="FRAUD">Fraud</option>
+                  <option value="INVENTORY">Inventory</option>
+                  <option value="DECLINED">Declined</option>
+                  <option value="STAFF">Staff</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              {/* Options */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: "28px",
+                  marginBottom: "24px",
+                  fontSize: "13px",
+                  color: "#374151",
+                }}
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={cancelRefund}
+                    onChange={(e) => setCancelRefund(e.target.checked)}
+                    disabled={editEligibility?.canEdit === false}
+                  />
+                  Issue refund
+                </label>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={cancelRestock}
+                    onChange={(e) => setCancelRestock(e.target.checked)}
+                    disabled={editEligibility?.canEdit === false}
+                  />
+                  Restock items
+                </label>
+              </div>
+
+              {/* Confirmation checkbox */}
+              <div
+                style={{
+                  marginBottom: "24px",
+                  padding: "12px 14px",
+                  borderRadius: "8px",
+                  background: "#fffbeb",
+                  border: "1px solid #fde68a",
+                  fontSize: "13px",
+                  color: "#92400e",
+                }}
+              >
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: "10px",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={cancelConfirmed}
+                    onChange={(e) => setCancelConfirmed(e.target.checked)}
+                    disabled={editEligibility?.canEdit === false}
+                    style={{ marginTop: "2px", flexShrink: 0 }}
+                  />
+                  I understand this action cannot be undone. I confirm I want to
+                  cancel this order.
+                </label>
+              </div>
+
+              {/* Result */}
+              {(cancelData || cancelError) && (
+                <div style={{ marginBottom: "20px" }}>
+                  <ResultBox data={cancelData} error={cancelError} />
+                </div>
+              )}
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  borderTop: "1px solid #f3f4f6",
+                  paddingTop: "20px",
+                }}
+              >
+                <button
+                  type="submit"
+                  disabled={
+                    isCancelling ||
+                    isCheckingEligibility ||
+                    editEligibility?.canEdit === false ||
+                    !cancelConfirmed
+                  }
+                  title={
+                    editEligibility?.canEdit === false
+                      ? (editEligibility.reason ?? undefined)
+                      : undefined
+                  }
+                  style={{
+                    padding: "10px 28px",
+                    border: "none",
+                    borderRadius: "8px",
+                    background:
+                      isCancelling ||
+                      isCheckingEligibility ||
+                      editEligibility?.canEdit === false ||
+                      !cancelConfirmed
+                        ? "#fca5a5"
+                        : "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
+                    color: "#fff",
+                    cursor:
+                      isCancelling ||
+                      isCheckingEligibility ||
+                      editEligibility?.canEdit === false ||
+                      !cancelConfirmed
+                        ? "not-allowed"
+                        : "pointer",
+                    fontSize: "14px",
+                    fontWeight: 700,
+                  }}
+                >
+                  {isCancelling ? "Cancelling..." : "Cancel Order"}
                 </button>
               </div>
             </form>
@@ -6278,10 +6630,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 )}
               </div>
 
-              {/* External Doc Info */}
+              {/* Zendesk Ticket # */}
               <div style={{ marginBottom: "20px" }}>
                 <label style={labelStyle}>
-                  External Doc Info{" "}
+                  Zendesk Ticket #{" "}
                   <span style={{ color: "#9ca3af", fontWeight: 400 }}>
                     (order level)
                   </span>
@@ -6305,7 +6657,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     type="text"
                     placeholder="e.g. INV-1234"
                     value={draftEditExternalDocInfo}
-                    onChange={(e) => setDraftEditExternalDocInfo(e.target.value)}
+                    onChange={(e) =>
+                      setDraftEditExternalDocInfo(e.target.value)
+                    }
                   />
                 )}
               </div>
