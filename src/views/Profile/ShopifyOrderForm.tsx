@@ -720,7 +720,9 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
 
   const [lotSearchTerm, setLotSearchTerm] = useState("");
   const [debouncedLotSearch, setDebouncedLotSearch] = useState("");
+
   const [showLotDropdown, setShowLotDropdown] = useState(false);
+
 
   const [pendingItemNo, setPendingItemNo] = useState<string | null>(null);
   const [pendingLotNo, setPendingLotNo] = useState<string | null>(null);
@@ -770,12 +772,22 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
       { skip: debouncedItemSearch.length < 2 || !!pendingItemNo },
     );
 
+  const isItemTyping =
+    itemSearchTerm.trim().length >= 2 &&
+    itemSearchTerm.trim() !== debouncedItemSearch;
+  const showItemLoader = isItemTyping || isItemSearching;
+
   // Search lots by lot_no
   const { data: lotSearchData, isFetching: isLotSearching } =
     useGetTouchupsQuery(
       { lot_no: debouncedLotSearch, isFromProps: false, page_size: 50 },
       { skip: debouncedLotSearch.length < 2 || !!pendingLotNo },
     );
+
+  const isLotTyping =
+    lotSearchTerm.trim().length >= 2 &&
+    lotSearchTerm.trim() !== debouncedLotSearch;
+  const showLotLoader = isLotTyping || isLotSearching;
 
   // Get available lots for a selected item
   const { data: lotsForItemData, isFetching: isFetchingLotsForItem } =
@@ -1009,7 +1021,7 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
             placeholder="Type item no…"
             style={{ ...inputStyle, fontSize: "13px", padding: "8px 12px" }}
           />
-          {isItemSearching && (
+          {showItemLoader && (
             <CircularProgress
               size={12}
               style={{
@@ -1023,7 +1035,7 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
         </div>
         {showItemDropdown &&
           debouncedItemSearch.length >= 2 &&
-          !isItemSearching &&
+          !showItemLoader &&
           itemSearchResults.length === 0 && (
             <div
               style={{
@@ -1199,7 +1211,7 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
             placeholder="Type lot no…"
             style={{ ...inputStyle, fontSize: "13px", padding: "8px 12px" }}
           />
-          {isLotSearching && (
+          {showLotLoader && (
             <CircularProgress
               size={12}
               style={{
@@ -1213,7 +1225,7 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
         </div>
         {showLotDropdown &&
           debouncedLotSearch.length >= 2 &&
-          !isLotSearching &&
+          !showLotLoader &&
           lotSearchResults.length === 0 && (
             <div
               style={{
@@ -1320,6 +1332,11 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
       { parts_item_no: `like:${debouncedSku}`, page_size: 50 },
       { skip: !customAddEnabled || debouncedSku.length < 2 },
     );
+
+  const isCustomTyping =
+    customSkuTerm.trim().length >= 2 &&
+    customSkuTerm.trim() !== debouncedSku;
+  const showCustomLoader = isCustomTyping || isCustomFetching;
 
   const customOptions: {
     value: string;
@@ -1762,7 +1779,7 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                       outline: "none",
                     }}
                   />
-                  {isCustomFetching && (
+                  {showCustomLoader && (
                     <span
                       style={{
                         position: "absolute",
@@ -1773,13 +1790,13 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                         color: "#9ca3af",
                       }}
                     >
-                      Searching…
+                      Searching...
                     </span>
                   )}
                 </div>
 
                 {debouncedSku.length >= 2 &&
-                  !isCustomFetching &&
+                  !showCustomLoader &&
                   customOptions.length === 0 && (
                     <div
                       style={{
