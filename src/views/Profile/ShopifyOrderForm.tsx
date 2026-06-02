@@ -4113,14 +4113,14 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             <div style={fieldWrap}>
               <label style={labelStyle}>
                 Zendesk Ticket #{" "}
-                <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+                {/* <span style={{ color: "#9ca3af", fontWeight: 400 }}>
                   (order level)
-                </span>
+                </span> */}
               </label>
               <input
                 style={inputStyle}
                 type="text"
-                placeholder="e.g. INV-1234"
+                placeholder="zendesk_"
                 value={selectedExternalDocInfo}
                 onChange={(e) => setSelectedExternalDocInfo(e.target.value)}
               />
@@ -6634,9 +6634,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               <div style={{ marginBottom: "20px" }}>
                 <label style={labelStyle}>
                   Zendesk Ticket #{" "}
-                  <span style={{ color: "#9ca3af", fontWeight: 400 }}>
+                  {/* <span style={{ color: "#9ca3af", fontWeight: 400 }}>
                     (order level)
-                  </span>
+                  </span> */}
                 </label>
                 {draftOrderStatus === "COMPLETED" ? (
                   <div
@@ -6655,7 +6655,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   <input
                     style={inputStyle}
                     type="text"
-                    placeholder="e.g. INV-1234"
+                    placeholder="zendesk_"
                     value={draftEditExternalDocInfo}
                     onChange={(e) =>
                       setDraftEditExternalDocInfo(e.target.value)
