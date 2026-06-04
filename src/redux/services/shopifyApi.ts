@@ -283,7 +283,12 @@ export const shopifyApi = createApi({
           price: string | null;
           sku: string | null;
         }>;
-        customItems: Array<{ title: string; quantity: number; price: string | null }>;
+        customItems: Array<{
+          title: string;
+          quantity: number;
+          price: string | null;
+          customAttributes: Array<{ key: string; value: string }>;
+        }>;
         customAttributes: Array<{ key: string; value: string }>;
         status: string | null;
       },
@@ -308,7 +313,12 @@ export const shopifyApi = createApi({
             sku: string | null;
           }
         >();
-        const customItems: Array<{ title: string; quantity: number; price: string | null }> = [];
+        const customItems: Array<{
+          title: string;
+          quantity: number;
+          price: string | null;
+          customAttributes: Array<{ key: string; value: string }>;
+        }> = [];
         for (const { node } of edges) {
           const variantId = node.variant?.id ?? null;
           if (variantId) {
@@ -328,6 +338,9 @@ export const shopifyApi = createApi({
               title: node.title ?? "",
               quantity: node.quantity ?? 0,
               price: node.originalUnitPriceSet?.shopMoney?.amount ?? null,
+              customAttributes: (node.customAttributes ?? []).filter(
+                (a: any) => a.key && a.value,
+              ),
             });
           }
         }
@@ -347,6 +360,7 @@ export const shopifyApi = createApi({
           title: string;
           quantity: number;
           sku: string | null;
+          customAttributes: Array<{ key: string; value: string }>;
         }>;
         shippingAddress: ShopifyOrderAddress | null;
         email: string | null;
@@ -369,6 +383,9 @@ export const shopifyApi = createApi({
             title: node.title ?? "",
             quantity: node.currentQuantity ?? node.quantity ?? 0,
             sku: node.sku?.sku ?? null,
+            customAttributes: (node.customAttributes ?? []).filter(
+              (a: any) => a.key && a.value,
+            ),
           }));
         return {
           lineItems,

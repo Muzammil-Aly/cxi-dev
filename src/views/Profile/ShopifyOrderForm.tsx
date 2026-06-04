@@ -25,6 +25,7 @@ import { useGetShopifyLineItemsQuery } from "../../redux/services/shopifyApi";
 import {
   useGetDistinctTouchupItemsQuery,
   useGetTouchupsQuery,
+  useGetTouchupPensQuery,
 } from "../../redux/services/InventoryApi";
 import { Autocomplete, CircularProgress, TextField } from "@mui/material";
 
@@ -66,6 +67,7 @@ interface LineItem {
     variantId?: string;
     productId?: string;
     reason_code?: string;
+    touchup_color?: string;
   }>;
   isCustomProduct?: boolean;
   customTitle?: string;
@@ -544,7 +546,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           o.label.toLowerCase().includes(search.toLowerCase()) ||
           o.value.toLowerCase().includes(search.toLowerCase()),
       )
-    : options.slice(0, 5);
+    : options;
 
   return (
     <div ref={ref} style={{ position: "relative", userSelect: "none" }}>
@@ -683,18 +685,6 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
               })
             )}
           </div>
-          {!search && options.length > 5 && (
-            <div
-              style={{
-                padding: "6px 14px 4px",
-                fontSize: "12px",
-                color: "#9ca3af",
-                borderTop: "1px solid #f3f4f6",
-              }}
-            >
-              Showing 5 of {options.length} — type to search
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -728,6 +718,9 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
   const [pendingLotNo, setPendingLotNo] = useState<string | null>(null);
   const [pendingPrice, setPendingPrice] = useState<number | null>(null);
 
+  const [lotForItemSearch, setLotForItemSearch] = useState("");
+  const [debouncedLotForItemSearch, setDebouncedLotForItemSearch] = useState("");
+
   const itemRef = useRef<HTMLDivElement>(null);
   const lotRef = useRef<HTMLDivElement>(null);
 
@@ -746,6 +739,21 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
     );
     return () => clearTimeout(t);
   }, [lotSearchTerm]);
+
+  useEffect(() => {
+    const t = setTimeout(
+      () => setDebouncedLotForItemSearch(lotForItemSearch.trim()),
+      400,
+    );
+    return () => clearTimeout(t);
+  }, [lotForItemSearch]);
+
+  useEffect(() => {
+    if (!pendingItemNo) {
+      setLotForItemSearch("");
+      setDebouncedLotForItemSearch("");
+    }
+  }, [pendingItemNo]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -792,8 +800,20 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
   // Get available lots for a selected item
   const { data: lotsForItemData, isFetching: isFetchingLotsForItem } =
     useGetTouchupsQuery(
-      { sku: pendingItemNo!, isFromProps: true, page_size: 100 },
-      { skip: !pendingItemNo || !!pendingLotNo },
+      { sku: pendingItemNo!, isFromProps: false, page_size: 100 },
+      { skip: !pendingItemNo || !!pendingLotNo, refetchOnMountOrArgChange: true },
+    );
+
+  // Search lots scoped to the selected item
+  const { data: lotSearchForItemData, isFetching: isSearchingLotsForItem } =
+    useGetTouchupsQuery(
+      {
+        sku: pendingItemNo!,
+        lot_no: debouncedLotForItemSearch,
+        isFromProps: false,
+        page_size: 50,
+      },
+      { skip: !pendingItemNo || debouncedLotForItemSearch.length < 2 || !!pendingLotNo, refetchOnMountOrArgChange: true },
     );
 
   // Get available items for a selected lot
@@ -825,6 +845,13 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
 
   const lotsForItem = dedupeBy<{ lot_no: string }>(
     (lotsForItemData?.data ?? [])
+      .filter((r: any) => r.lot_no)
+      .map((r: any) => ({ lot_no: r.lot_no as string })),
+    (r) => r.lot_no,
+  );
+
+  const lotsForItemSearchResults = dedupeBy<{ lot_no: string }>(
+    (lotSearchForItemData?.data ?? [])
       .filter((r: any) => r.lot_no)
       .map((r: any) => ({ lot_no: r.lot_no as string })),
     (r) => r.lot_no,
@@ -1143,20 +1170,41 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
       );
     }
 
-    // Item was picked first — show lots for that item
+    // Item was picked first — show lots for that item (optional, with search)
     if (pendingItemNo) {
+      const isLotForItemTyping =
+        lotForItemSearch.trim().length >= 2 &&
+        lotForItemSearch.trim() !== debouncedLotForItemSearch;
+      const showLotForItemLoader =
+        isLotForItemTyping || isSearchingLotsForItem || isFetchingLotsForItem;
+      const isSearching = debouncedLotForItemSearch.length >= 2;
+      const displayedLots = isSearching ? lotsForItemSearchResults : lotsForItem;
+
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {label}
-          {isFetchingLotsForItem ? (
+
+          {/* Lot search input — always visible */}
+          <input
+            type="text"
+            value={lotForItemSearch}
+            onChange={(e) => setLotForItemSearch(e.target.value)}
+            placeholder="Search lot no…"
+            style={{ ...inputStyle, fontSize: "13px", padding: "8px 12px" }}
+          />
+
+          {/* Loading indicator */}
+          {showLotForItemLoader && (
             <div style={loadingCell}>
-              <CircularProgress size={12} /> Loading…
+              <CircularProgress size={12} />
+              {isSearching ? "Searching…" : "Loading…"}
             </div>
-          ) : lotsForItem.length === 0 ? (
-            emptyCell("No lots available", true)
-          ) : (
+          )}
+
+          {/* Lots list */}
+          {!showLotForItemLoader && displayedLots.length > 0 && (
             <div style={listBox}>
-              {lotsForItem.map((r) => (
+              {displayedLots.map((r) => (
                 <div
                   key={r.lot_no}
                   onClick={() =>
@@ -1181,6 +1229,42 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
               ))}
             </div>
           )}
+
+          {/* No results for search */}
+          {isSearching && !showLotForItemLoader && lotsForItemSearchResults.length === 0 && (
+            <div
+              style={{
+                fontSize: "12px",
+                color: "#9ca3af",
+                padding: "4px 2px",
+              }}
+            >
+              No lots found
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() =>
+              onPopulate({
+                item_no: pendingItemNo,
+                lot_no: "",
+                unit_price: pendingPrice,
+              })
+            }
+            style={{
+              padding: "6px 10px",
+              border: "1.5px dashed #d1d5db",
+              borderRadius: "6px",
+              fontSize: "12px",
+              color: "#6b7280",
+              background: "transparent",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            Proceed without Lot No
+          </button>
         </div>
       );
     }
@@ -1292,6 +1376,7 @@ type PartRow = {
   variantId?: string;
   productId?: string;
   reason_code?: string;
+  touchup_color?: string;
 };
 
 interface PartsSubSectionProps {
@@ -1322,16 +1407,74 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
   const [customSkuTerm, setCustomSkuTerm] = useState("");
   const [debouncedSku, setDebouncedSku] = useState("");
 
+  const [touchupPenSearchEnabled, setTouchupPenSearchEnabled] = useState(false);
+  const [touchupPenSearchTerm, setTouchupPenSearchTerm] = useState("");
+  const [debouncedTouchupPenSearch, setDebouncedTouchupPenSearch] =
+    useState("");
+
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSku(customSkuTerm.trim()), 400);
     return () => clearTimeout(t);
   }, [customSkuTerm]);
+
+  useEffect(() => {
+    const t = setTimeout(
+      () => setDebouncedTouchupPenSearch(touchupPenSearchTerm.trim()),
+      400,
+    );
+    return () => clearTimeout(t);
+  }, [touchupPenSearchTerm]);
 
   const { data: customSkuData, isFetching: isCustomFetching } =
     useGetDistinctTouchupItemsQuery(
       { parts_item_no: `like:${debouncedSku}`, page_size: 50 },
       { skip: !customAddEnabled || debouncedSku.length < 2 },
     );
+
+  const { data: touchupPenData, isFetching: isTouchupPenFetching } =
+    useGetTouchupPensQuery(
+      { item_num: `like:${debouncedTouchupPenSearch}`, page_size: 50 },
+      {
+        skip:
+          !touchupPenSearchEnabled || debouncedTouchupPenSearch.length < 2,
+      },
+    );
+
+  const isTouchupPenTyping =
+    touchupPenSearchTerm.trim().length >= 2 &&
+    touchupPenSearchTerm.trim() !== debouncedTouchupPenSearch;
+  const showTouchupPenLoader = isTouchupPenTyping || isTouchupPenFetching;
+
+  const touchupPenOptions: {
+    value: string;
+    label: string;
+    key: string;
+    color: string | null;
+  }[] = (touchupPenData?.results ?? []).map((p: any, i: number) => {
+    const base = p.ItemName2 || p.ItemName || p.ItemNum;
+    const color = p.ColorName || p.Colorslug || null;
+    return {
+      value: p.ItemNum,
+      label: color ? `${p.ItemNum} — ${base} (${color})` : `${p.ItemNum} — ${base}`,
+      key: `${p.ItemNum}-${p.Colorslug ?? ""}-${i}`,
+      color,
+    };
+  });
+
+  const handleTouchupPenSelect = (val: string, color?: string | null) => {
+    onChange([
+      ...parts,
+      {
+        parts_item_no: val,
+        parts_qty: 1,
+        parts_unit_price: null,
+        ...(color ? { touchup_color: color } : {}),
+      },
+    ]);
+    setTouchupPenSearchEnabled(false);
+    setTouchupPenSearchTerm("");
+    setDebouncedTouchupPenSearch("");
+  };
 
   const isCustomTyping =
     customSkuTerm.trim().length >= 2 &&
@@ -1589,6 +1732,23 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                       }
                       placeholder="— select part —"
                     />
+                  )}
+                  {row.touchup_color && (
+                    <span
+                      style={{
+                        display: "inline-block",
+                        marginTop: "4px",
+                        padding: "2px 8px",
+                        borderRadius: "12px",
+                        background: "#ede9fe",
+                        color: "#6d28d9",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        letterSpacing: "0.02em",
+                      }}
+                    >
+                      {row.touchup_color}
+                    </span>
                   )}
                 </div>
 
@@ -1862,6 +2022,140 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                             ${opt.price.toFixed(2)}
                           </span>
                         )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Touchup Pen SKU search */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "7px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#6366f1",
+                userSelect: "none",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={touchupPenSearchEnabled}
+                onChange={(e) => {
+                  setTouchupPenSearchEnabled(e.target.checked);
+                  if (!e.target.checked) {
+                    setTouchupPenSearchTerm("");
+                    setDebouncedTouchupPenSearch("");
+                  }
+                }}
+                style={{
+                  accentColor: "#6366f1",
+                  width: "14px",
+                  height: "14px",
+                }}
+              />
+              Search & add touchup pen by item no
+            </label>
+
+            {touchupPenSearchEnabled && (
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: "6px" }}
+              >
+                <div style={{ position: "relative" }}>
+                  <input
+                    type="text"
+                    value={touchupPenSearchTerm}
+                    onChange={(e) => setTouchupPenSearchTerm(e.target.value)}
+                    placeholder="Type touchup pen item no to search…"
+                    autoFocus
+                    style={{
+                      width: "100%",
+                      padding: "7px 10px",
+                      border: "1.5px solid #a5b4fc",
+                      borderRadius: "8px",
+                      fontSize: "13px",
+                      background: "#fff",
+                      color: "#111827",
+                      boxSizing: "border-box",
+                      outline: "none",
+                    }}
+                  />
+                  {showTouchupPenLoader && (
+                    <span
+                      style={{
+                        position: "absolute",
+                        right: "10px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        fontSize: "11px",
+                        color: "#9ca3af",
+                      }}
+                    >
+                      Searching...
+                    </span>
+                  )}
+                </div>
+
+                {debouncedTouchupPenSearch.length >= 2 &&
+                  !showTouchupPenLoader &&
+                  touchupPenOptions.length === 0 && (
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "#9ca3af",
+                        paddingLeft: "4px",
+                      }}
+                    >
+                      No touchup pens found for "{debouncedTouchupPenSearch}".
+                    </div>
+                  )}
+
+                {touchupPenOptions.length > 0 && (
+                  <div
+                    style={{
+                      border: "1px solid #ddd6fe",
+                      borderRadius: "8px",
+                      background: "#fff",
+                      overflow: "hidden",
+                      maxHeight: "200px",
+                      overflowY: "auto",
+                    }}
+                  >
+                    {touchupPenOptions.map((opt) => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => handleTouchupPenSelect(opt.value, opt.color)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          padding: "8px 12px",
+                          background: "none",
+                          border: "none",
+                          borderBottom: "1px solid #f3f4f6",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          color: "#111827",
+                          textAlign: "left",
+                        }}
+                        onMouseEnter={(e) =>
+                          ((
+                            e.currentTarget as HTMLButtonElement
+                          ).style.background = "#f5f3ff")
+                        }
+                        onMouseLeave={(e) =>
+                          ((
+                            e.currentTarget as HTMLButtonElement
+                          ).style.background = "none")
+                        }
+                      >
+                        {opt.label}
                       </button>
                     ))}
                   </div>
@@ -2890,6 +3184,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       quantity: number;
       price: string | null;
       pendingRemove: boolean;
+      customAttributes: Array<{ key: string; value: string }>;
     }[]
   >([]);
   const [draftNewItems, setDraftNewItems] = useState<DraftNewLineItem[]>([]);
@@ -2933,6 +3228,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       draftLineItemsData.customItems.map((ci) => ({
         ...ci,
         pendingRemove: false,
+        customAttributes: ci.customAttributes ?? [],
       })),
     );
     setDraftNewItems([]);
@@ -3315,6 +3611,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               name: "return_reason_code",
               value: part.reason_code,
             });
+          if (part.touchup_color)
+            partProps.push({
+              name: "touchup_color",
+              value: part.touchup_color,
+            });
           result.push({
             quantity: part.parts_qty,
             title: part.parts_item_no,
@@ -3499,9 +3800,12 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     // - Existing variant items (qty=0 tells backend to remove)
     // - New variant items added by user (qty>0 only)
     // - All existing custom items (qty=0 if pendingRemove → backend drops them)
-    // - New custom items with reason codes (title required)
+    // - New custom items with reason codes (title required, OR parts-only items)
     const validNewCustom = draftNewCustomItems.filter(
-      (li) => li.title.trim() && li.quantity > 0,
+      (li) =>
+        (!draftWashWholeUnit &&
+          li.parts.some((p) => p.parts_item_no.trim())) ||
+        (li.title.trim() && li.quantity > 0),
     );
 
     // Expand custom items with parts into individual part line items (same as create flow)
@@ -3513,6 +3817,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       sku?: string;
       lotNo?: string;
       itemNo?: string;
+      touchupColor?: string;
     }> = [];
     for (const li of validNewCustom) {
       const activeParts = !draftWashWholeUnit
@@ -3530,6 +3835,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             ...(li.title ? { itemNo: li.title } : {}),
             ...(li.lot_no ? { lotNo: li.lot_no } : {}),
             sku: part.parts_item_no,
+            ...(part.touchup_color
+              ? { touchupColor: part.touchup_color }
+              : {}),
           });
         }
       } else {
@@ -3559,6 +3867,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       sku?: string;
       lotNo?: string;
       itemNo?: string;
+      touchupColor?: string;
     }> = [
       ...draftVariantItems.map((li) => ({
         variantId: li.variantId,
@@ -4548,7 +4857,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                             background: "#f9fafb",
                           }}
                         >
-                          {item.lot_no ?? "—"}
+                          {item.lot_no || "—"}
                         </div>
                       </div>
                     </>
@@ -4742,24 +5051,22 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 />
               </div>
             ))}
-            {availableLineItems.length === 0 && (
-              <button
-                type="button"
-                onClick={addLineItem}
-                style={{
-                  padding: "8px 16px",
-                  border: "1.5px dashed #a5b4fc",
-                  borderRadius: "8px",
-                  background: "#f5f3ff",
-                  color: "#4f46e5",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                }}
-              >
-                + Add Line Item
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={addLineItem}
+              style={{
+                padding: "8px 16px",
+                border: "1.5px dashed #a5b4fc",
+                borderRadius: "8px",
+                background: "#f5f3ff",
+                color: "#4f46e5",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: 600,
+              }}
+            >
+              + Add Line Item
+            </button>
           </div>
 
           {/* Shipping Address */}
@@ -7204,101 +7511,121 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                       <div
                         key={i}
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr 120px 120px auto",
-                          gap: "12px",
-                          alignItems: "center",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px",
                           padding: "10px 14px",
                           borderRadius: "10px",
                           border: `1.5px solid ${item.pendingRemove ? "#fca5a5" : "#e5e7eb"}`,
-                          background: item.pendingRemove
-                            ? "#fff7f7"
-                            : "#fafafa",
+                          background: item.pendingRemove ? "#fff7f7" : "#fafafa",
                           opacity: item.pendingRemove ? 0.75 : 1,
                         }}
                       >
-                        <span
+                        {/* Title + attributes */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              fontSize: "13px",
+                              color: item.pendingRemove ? "#dc2626" : "#111827",
+                              textDecoration: item.pendingRemove ? "line-through" : "none",
+                            }}
+                          >
+                            {item.title}
+                          </span>
+                          {item.customAttributes.map((attr) => (
+                            <span
+                              key={attr.key}
+                              style={{ fontSize: "11px", color: "#6b7280", lineHeight: 1.4 }}
+                            >
+                              <span style={{ fontWeight: 600, color: "#374151" }}>{attr.key}:</span>{" "}
+                              {attr.value}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Controls */}
+                        <div
                           style={{
-                            fontWeight: 600,
-                            fontSize: "13px",
-                            color: item.pendingRemove ? "#dc2626" : "#111827",
-                            textDecoration: item.pendingRemove
-                              ? "line-through"
-                              : "none",
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr auto",
+                            gap: "8px",
+                            alignItems: "center",
                           }}
                         >
-                          {item.title}
-                        </span>
-                        <input
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          value={item.price ?? ""}
-                          disabled={item.pendingRemove}
-                          onChange={(e) =>
-                            setDraftCustomItems((prev) =>
-                              prev.map((li, idx) =>
-                                idx === i
-                                  ? { ...li, price: e.target.value || null }
-                                  : li,
-                              ),
-                            )
-                          }
-                          placeholder="Price"
-                          style={{
-                            ...inputStyle,
-                            opacity: item.pendingRemove ? 0.5 : 1,
-                          }}
-                        />
-                        <input
-                          type="number"
-                          min={1}
-                          value={item.pendingRemove ? 0 : item.quantity}
-                          disabled={item.pendingRemove}
-                          onChange={(e) => {
-                            const qty = parseInt(e.target.value, 10);
-                            if (!isNaN(qty) && qty >= 1) {
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={item.price ?? ""}
+                            disabled={item.pendingRemove}
+                            onChange={(e) =>
                               setDraftCustomItems((prev) =>
                                 prev.map((li, idx) =>
-                                  idx === i ? { ...li, quantity: qty } : li,
+                                  idx === i
+                                    ? { ...li, price: e.target.value || null }
+                                    : li,
                                 ),
-                              );
+                              )
                             }
-                          }}
-                          placeholder="Qty"
-                          style={{
-                            ...inputStyle,
-                            opacity: item.pendingRemove ? 0.5 : 1,
-                          }}
-                        />
-                        <button
-                          type="button"
-                          title={
-                            item.pendingRemove ? "Undo removal" : "Remove item"
-                          }
-                          onClick={() =>
-                            setDraftCustomItems((prev) =>
-                              prev.map((li, idx) =>
-                                idx === i
-                                  ? { ...li, pendingRemove: !li.pendingRemove }
-                                  : li,
-                              ),
-                            )
-                          }
-                          style={{
-                            padding: "7px 12px",
-                            border: `1.5px solid ${item.pendingRemove ? "#a5b4fc" : "#fca5a5"}`,
-                            borderRadius: "8px",
-                            background: "#fff",
-                            color: item.pendingRemove ? "#4f46e5" : "#dc2626",
-                            cursor: "pointer",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {item.pendingRemove ? "↩ Undo" : "✕ Remove"}
-                        </button>
+                            placeholder="Price"
+                            style={{
+                              ...inputStyle,
+                              fontSize: "12px",
+                              padding: "6px 10px",
+                              opacity: item.pendingRemove ? 0.5 : 1,
+                            }}
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.pendingRemove ? 0 : item.quantity}
+                            disabled={item.pendingRemove}
+                            onChange={(e) => {
+                              const qty = parseInt(e.target.value, 10);
+                              if (!isNaN(qty) && qty >= 1) {
+                                setDraftCustomItems((prev) =>
+                                  prev.map((li, idx) =>
+                                    idx === i ? { ...li, quantity: qty } : li,
+                                  ),
+                                );
+                              }
+                            }}
+                            placeholder="Qty"
+                            style={{
+                              ...inputStyle,
+                              fontSize: "12px",
+                              padding: "6px 10px",
+                              opacity: item.pendingRemove ? 0.5 : 1,
+                            }}
+                          />
+                          <button
+                            type="button"
+                            title={item.pendingRemove ? "Undo removal" : "Remove item"}
+                            onClick={() =>
+                              setDraftCustomItems((prev) =>
+                                prev.map((li, idx) =>
+                                  idx === i
+                                    ? { ...li, pendingRemove: !li.pendingRemove }
+                                    : li,
+                                ),
+                              )
+                            }
+                            style={{
+                              padding: "6px 12px",
+                              border: `1.5px solid ${item.pendingRemove ? "#a5b4fc" : "#fca5a5"}`,
+                              borderRadius: "8px",
+                              background: "#fff",
+                              color: item.pendingRemove ? "#4f46e5" : "#dc2626",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                              fontWeight: 600,
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.pendingRemove ? "↩ Undo" : "✕ Remove"}
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
