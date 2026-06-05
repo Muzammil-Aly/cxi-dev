@@ -7,6 +7,7 @@ import SupportAgentIcon from "@mui/icons-material/SupportAgent";
 import EventIcon from "@mui/icons-material/Event";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
+import InsightsIcon from "@mui/icons-material/Insights";
 import Sidebar from "./Sidebar";
 import GenieChatbot from "@/components/GenieChatbot";
 import { useRouter } from "next/navigation";
@@ -78,6 +79,12 @@ const ProfileLayout: React.FC<ProfileLayoutProps> = ({
       label: "Admin Oversight",
       icon: <AdminPanelSettingsIcon />,
       path: "/admin-oversight",
+    },
+    {
+      key: "Open Genie",
+      label: "Open Genie",
+      icon: <InsightsIcon />,
+      path: "/genie",
     },
   ];
   const [filteredMenuItems, setFilteredMenuItems] = useState(menuItems);

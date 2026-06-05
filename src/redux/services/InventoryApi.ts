@@ -378,8 +378,13 @@ export const inventoryApi = createApi({
         if (order_id) params.set("order_id", order_id);
         // if (lot_no !== undefined) params.set("lot_no", lot_no ?? "");
         // if (lot_no) params.set("lot_no", lot_no);
-        if (lot_no)
-          params.set("lot_no", isFromProps ? lot_no : `like:${lot_no}`);
+        if (lot_no !== undefined) {
+          if (lot_no === null) {
+            params.set("lot_no", "null");
+          } else {
+            params.set("lot_no", isFromProps ? lot_no : `like:${lot_no}`);
+          }
+        }
         // if (sku) params.set("sku", sku);
         if (sku) params.set("sku", isFromProps ? sku : `like:${sku}`);
         if (customer_id) params.set("customer_id", customer_id);

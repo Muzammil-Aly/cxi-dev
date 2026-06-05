@@ -365,6 +365,7 @@ const StoreDropdown: React.FC<StoreDropdownProps> = ({
 interface CustomDropdownOption {
   value: string;
   label: string;
+  lot_no?: string | null;
 }
 
 interface CustomDropdownProps {
@@ -448,11 +449,11 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({
             padding: "6px",
           }}
         >
-          {options.map((opt) => {
+          {options.map((opt, i) => {
             const isSelected = opt.value === value;
             return (
               <div
-                key={opt.label}
+                key={`${opt.value}-${opt.lot_no ?? ""}-${i}`}
                 onClick={() => {
                   onChange(opt.value);
                   setOpen(false);
@@ -632,11 +633,11 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
                 No results
               </div>
             ) : (
-              filtered.map((opt) => {
+              filtered.map((opt, i) => {
                 const isSelected = opt.value === value;
                 return (
                   <div
-                    key={opt.label}
+                    key={`${opt.value}-${opt.lot_no ?? ""}-${i}`}
                     onClick={() => {
                       onChange(opt.value);
                       setOpen(false);
@@ -1373,6 +1374,7 @@ type PartRow = {
   parts_item_no: string;
   parts_qty: number;
   parts_unit_price: number | null;
+  potential_qty_available?: number | null;
   variantId?: string;
   productId?: string;
   reason_code?: string;
@@ -1485,20 +1487,29 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     value: string;
     label: string;
     price: number | null;
+    lot_no: string | null;
+    potential_qty_available: number | null;
   }[] = (customSkuData?.data ?? []).map((p: any) => ({
     value: p.parts_item_no,
     label: p.parts_item_no,
     price: p.unit_price != null ? Number(p.unit_price) : null,
+    lot_no: p.lot_no ?? null,
+    potential_qty_available:
+      p.potential_qty_available != null ? Number(p.potential_qty_available) : null,
   }));
 
-  const handleCustomSelect = (val: string) => {
-    const found = customSkuData?.data?.find(
-      (p: any) => p.parts_item_no === val,
-    );
+  const handleCustomSelect = (index: number) => {
+    const found = customSkuData?.data?.[index];
+    if (!found) return;
+    const val = found.parts_item_no as string;
     const price = found?.unit_price != null ? Number(found.unit_price) : null;
+    const potential_qty_available =
+      found?.potential_qty_available != null
+        ? Number(found.potential_qty_available)
+        : null;
     onChange([
       ...parts,
-      { parts_item_no: val, parts_qty: 1, parts_unit_price: price },
+      { parts_item_no: val, parts_qty: 1, parts_unit_price: price, potential_qty_available },
     ]);
     setCustomAddEnabled(false);
     setCustomSkuTerm("");
@@ -1508,7 +1519,7 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
   const { data: touchupData, isFetching } = useGetTouchupsQuery(
     {
       sku: item_no || undefined,
-      lot_no: lot_no ?? undefined,
+      lot_no: lot_no !== undefined ? (lot_no || null) : undefined,
       isFromProps: true,
       page_size: 100,
     },
@@ -1522,12 +1533,20 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     ]),
   );
 
+  const partQtyAvailableMap = new Map<string, number | null>(
+    (touchupData?.data ?? []).map((p: any) => [
+      p.parts_item_no,
+      p.potential_qty_available != null ? Number(p.potential_qty_available) : null,
+    ]),
+  );
+
   const partsOptions: CustomDropdownOption[] = (touchupData?.data ?? []).map(
     (p: any) => ({
       value: p.parts_item_no,
       label: p.parts_item_name_2
         ? `${p.parts_item_no} — ${p.parts_item_name_2}`
         : p.parts_item_no,
+      lot_no: p.lot_no ?? null,
     }),
   );
 
@@ -1536,7 +1555,8 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
 
   const selectPartForRow = (i: number, val: string) => {
     const price = partPriceMap.has(val) ? partPriceMap.get(val)! : null;
-    updateRow(i, { parts_item_no: val, parts_unit_price: price });
+    const potential_qty_available = partQtyAvailableMap.has(val) ? partQtyAvailableMap.get(val)! : null;
+    updateRow(i, { parts_item_no: val, parts_unit_price: price, potential_qty_available });
   };
 
   const addRow = () => onChange([...parts, EMPTY_PART()]);
@@ -1691,65 +1711,101 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                   </button>
                 </div>
 
-                {/* Part Item No */}
+                {/* Part Item No + QTY Available */}
                 <div
                   style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "4px",
+                    display: "grid",
+                    gridTemplateColumns: "1fr 100px",
+                    gap: "10px",
+                    alignItems: "start",
                   }}
                 >
-                  <span
+                  <div
                     style={{
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      color: "#6b7280",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
                     }}
                   >
-                    Part Item No
-                  </span>
-                  {!isFetching &&
-                  partsOptions.length === 0 &&
-                  !row.parts_item_no ? (
-                    <div style={{ fontSize: "12px", color: "#9ca3af" }}>
-                      No parts found for this item.
-                    </div>
-                  ) : (
-                    <SearchableDropdown
-                      value={row.parts_item_no}
-                      onChange={(val) => selectPartForRow(i, val)}
-                      options={
-                        row.parts_item_no &&
-                        !partsOptions.find((o) => o.value === row.parts_item_no)
-                          ? [
-                              ...partsOptions,
-                              {
-                                value: row.parts_item_no,
-                                label: row.parts_item_no,
-                              },
-                            ]
-                          : partsOptions
-                      }
-                      placeholder="— select part —"
-                    />
-                  )}
-                  {row.touchup_color && (
                     <span
                       style={{
-                        display: "inline-block",
-                        marginTop: "4px",
-                        padding: "2px 8px",
-                        borderRadius: "12px",
-                        background: "#ede9fe",
-                        color: "#6d28d9",
                         fontSize: "11px",
                         fontWeight: 600,
-                        letterSpacing: "0.02em",
+                        color: "#6b7280",
                       }}
                     >
-                      {row.touchup_color}
+                      Part Item No
                     </span>
-                  )}
+                    {!isFetching &&
+                    partsOptions.length === 0 &&
+                    !row.parts_item_no ? (
+                      <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+                        No parts found for this item.
+                      </div>
+                    ) : (
+                      <SearchableDropdown
+                        value={row.parts_item_no}
+                        onChange={(val) => selectPartForRow(i, val)}
+                        options={
+                          row.parts_item_no &&
+                          !partsOptions.find((o) => o.value === row.parts_item_no)
+                            ? [
+                                ...partsOptions,
+                                {
+                                  value: row.parts_item_no,
+                                  label: row.parts_item_no,
+                                },
+                              ]
+                            : partsOptions
+                        }
+                        placeholder="— select part —"
+                      />
+                    )}
+                    {row.touchup_color && (
+                      <span
+                        style={{
+                          display: "inline-block",
+                          marginTop: "4px",
+                          padding: "2px 8px",
+                          borderRadius: "12px",
+                          background: "#ede9fe",
+                          color: "#6d28d9",
+                          fontSize: "11px",
+                          fontWeight: 600,
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        {row.touchup_color}
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      QTY Available
+                    </span>
+                    <div
+                      style={{
+                        ...fieldStyle,
+                        color: (row.potential_qty_available ?? partQtyAvailableMap.get(row.parts_item_no)) != null ? "#111827" : "#9ca3af",
+                        background: "#f3f4f6",
+                        cursor: "not-allowed",
+                      }}
+                    >
+                      {(row.potential_qty_available ?? partQtyAvailableMap.get(row.parts_item_no)) ?? "—"}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Qty / Unit Price / Line Amount */}
@@ -1980,15 +2036,15 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                       overflowY: "auto",
                     }}
                   >
-                    {customOptions.map((opt) => (
+                    {customOptions.map((opt, i) => (
                       <button
-                        key={opt.value}
+                        key={`${opt.value}-${i}`}
                         type="button"
-                        onClick={() => handleCustomSelect(opt.value)}
+                        onClick={() => handleCustomSelect(i)}
                         style={{
                           display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
+                          flexDirection: "column",
+                          alignItems: "flex-start",
                           width: "100%",
                           padding: "8px 12px",
                           background: "none",
@@ -1998,6 +2054,7 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                           fontSize: "12px",
                           color: "#111827",
                           textAlign: "left",
+                          gap: "3px",
                         }}
                         onMouseEnter={(e) =>
                           ((
@@ -2010,18 +2067,16 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                           ).style.background = "none")
                         }
                       >
-                        <span>{opt.label}</span>
-                        {opt.price != null && (
-                          <span
-                            style={{
-                              color: "#059669",
-                              fontWeight: 600,
-                              marginLeft: "8px",
-                            }}
-                          >
-                            ${opt.price.toFixed(2)}
-                          </span>
-                        )}
+                        <span style={{ fontWeight: 600 }}>{opt.label}</span>
+                        <span style={{ display: "flex", gap: "12px", fontSize: "11px", color: "#6b7280" }}>
+                          <span>Lot: {opt.lot_no ?? "—"}</span>
+                          <span>QTY Available: {opt.potential_qty_available ?? "—"}</span>
+                          {opt.price != null && (
+                            <span style={{ color: "#059669", fontWeight: 600 }}>
+                              ${opt.price.toFixed(2)}
+                            </span>
+                          )}
+                        </span>
                       </button>
                     ))}
                   </div>
