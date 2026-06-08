@@ -1939,6 +1939,24 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
             );
           })}
 
+          <button
+            type="button"
+            onClick={addRow}
+            style={{
+              padding: "6px 14px",
+              border: "1.5px dashed #c4b5fd",
+              borderRadius: "8px",
+              background: "#f5f3ff",
+              color: "#6366f1",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: 600,
+              alignSelf: "flex-start",
+            }}
+          >
+            + Add Part
+          </button>
+
           {/* Custom SKU search */}
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <label
@@ -2219,23 +2237,6 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={addRow}
-            style={{
-              padding: "6px 14px",
-              border: "1.5px dashed #c4b5fd",
-              borderRadius: "8px",
-              background: "#f5f3ff",
-              color: "#6366f1",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontWeight: 600,
-              alignSelf: "flex-start",
-            }}
-          >
-            + Add Part
-          </button>
         </div>
       )}
     </div>
