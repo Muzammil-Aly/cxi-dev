@@ -26,6 +26,7 @@ import {
   useGetDistinctTouchupItemsQuery,
   useGetTouchupsQuery,
   useGetTouchupPensQuery,
+  useGetDistinctTouchupPensQuery,
 } from "../../redux/services/InventoryApi";
 import { Autocomplete, CircularProgress, TextField } from "@mui/material";
 
@@ -1375,6 +1376,7 @@ type PartRow = {
   parts_qty: number;
   parts_unit_price: number | null;
   potential_qty_available?: number | null;
+  earliest_avail_date?: string | null;
   variantId?: string;
   productId?: string;
   reason_code?: string;
@@ -1434,8 +1436,8 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     );
 
   const { data: touchupPenData, isFetching: isTouchupPenFetching } =
-    useGetTouchupPensQuery(
-      { item_num: `like:${debouncedTouchupPenSearch}`, page_size: 50 },
+    useGetDistinctTouchupPensQuery(
+      { search: debouncedTouchupPenSearch, page_size: 50 },
       {
         skip:
           !touchupPenSearchEnabled || debouncedTouchupPenSearch.length < 2,
@@ -1451,26 +1453,37 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     value: string;
     label: string;
     key: string;
-    color: string | null;
+    unit_price: number | null;
+    qty_available: number | null;
+    earliest_avail_date: string | null;
   }[] = (touchupPenData?.results ?? []).map((p: any, i: number) => {
-    const base = p.ItemName2 || p.ItemName || p.ItemNum;
-    const color = p.ColorName || p.Colorslug || null;
+    const base = p.item_name_2 || p.item_num;
+    const qtyPart = p.qty_available != null ? ` | Qty: ${p.qty_available}` : "";
+    const pricePart = p.unit_price != null ? ` | $${Number(p.unit_price).toFixed(2)}` : "";
     return {
-      value: p.ItemNum,
-      label: color ? `${p.ItemNum} — ${base} (${color})` : `${p.ItemNum} — ${base}`,
-      key: `${p.ItemNum}-${p.Colorslug ?? ""}-${i}`,
-      color,
+      value: p.item_num,
+      label: `${p.item_num} — ${base}${qtyPart}${pricePart}`,
+      key: `${p.item_num}-${i}`,
+      unit_price: p.unit_price,
+      qty_available: p.qty_available,
+      earliest_avail_date: p.earliest_avail_date ?? null,
     };
   });
 
-  const handleTouchupPenSelect = (val: string, color?: string | null) => {
+  const handleTouchupPenSelect = (
+    val: string,
+    unit_price: number | null,
+    qty_available: number | null,
+    earliest_avail_date: string | null,
+  ) => {
     onChange([
       ...parts,
       {
         parts_item_no: val,
         parts_qty: 1,
-        parts_unit_price: null,
-        ...(color ? { touchup_color: color } : {}),
+        parts_unit_price: unit_price,
+        potential_qty_available: qty_available,
+        earliest_avail_date,
       },
     ]);
     setTouchupPenSearchEnabled(false);
@@ -1489,6 +1502,7 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     price: number | null;
     lot_no: string | null;
     potential_qty_available: number | null;
+    earliest_avail_date: string | null;
   }[] = (customSkuData?.data ?? []).map((p: any) => ({
     value: p.parts_item_no,
     label: p.parts_item_no,
@@ -1496,6 +1510,7 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     lot_no: p.lot_no ?? null,
     potential_qty_available:
       p.potential_qty_available != null ? Number(p.potential_qty_available) : null,
+    earliest_avail_date: p.earliest_avail_date ?? null,
   }));
 
   const handleCustomSelect = (index: number) => {
@@ -1507,9 +1522,10 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
       found?.potential_qty_available != null
         ? Number(found.potential_qty_available)
         : null;
+    const earliest_avail_date = found?.earliest_avail_date ?? null;
     onChange([
       ...parts,
-      { parts_item_no: val, parts_qty: 1, parts_unit_price: price, potential_qty_available },
+      { parts_item_no: val, parts_qty: 1, parts_unit_price: price, potential_qty_available, earliest_avail_date },
     ]);
     setCustomAddEnabled(false);
     setCustomSkuTerm("");
@@ -1540,6 +1556,13 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     ]),
   );
 
+  const partEarliestAvailDateMap = new Map<string, string | null>(
+    (touchupData?.data ?? []).map((p: any) => [
+      p.parts_item_no,
+      p.earliest_avail_date ?? null,
+    ]),
+  );
+
   const partsOptions: CustomDropdownOption[] = (touchupData?.data ?? []).map(
     (p: any) => ({
       value: p.parts_item_no,
@@ -1556,7 +1579,8 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
   const selectPartForRow = (i: number, val: string) => {
     const price = partPriceMap.has(val) ? partPriceMap.get(val)! : null;
     const potential_qty_available = partQtyAvailableMap.has(val) ? partQtyAvailableMap.get(val)! : null;
-    updateRow(i, { parts_item_no: val, parts_unit_price: price, potential_qty_available });
+    const earliest_avail_date = partEarliestAvailDateMap.has(val) ? partEarliestAvailDateMap.get(val)! : null;
+    updateRow(i, { parts_item_no: val, parts_unit_price: price, potential_qty_available, earliest_avail_date });
   };
 
   const addRow = () => onChange([...parts, EMPTY_PART()]);
@@ -1711,11 +1735,11 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                   </button>
                 </div>
 
-                {/* Part Item No + QTY Available */}
+                {/* Part Item No + QTY Available + Earliest Avail Date */}
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 100px",
+                    gridTemplateColumns: "1fr 100px 140px",
                     gap: "10px",
                     alignItems: "start",
                   }}
@@ -1804,6 +1828,33 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                       }}
                     >
                       {(row.potential_qty_available ?? partQtyAvailableMap.get(row.parts_item_no)) ?? "—"}
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#6b7280",
+                      }}
+                    >
+                      Earliest Avail Date
+                    </span>
+                    <div
+                      style={{
+                        ...fieldStyle,
+                        color: (row.earliest_avail_date ?? partEarliestAvailDateMap.get(row.parts_item_no)) ? "#111827" : "#9ca3af",
+                        background: "#f3f4f6",
+                        cursor: "not-allowed",
+                      }}
+                    >
+                      {(row.earliest_avail_date ?? partEarliestAvailDateMap.get(row.parts_item_no)) || "—"}
                     </div>
                   </div>
                 </div>
@@ -2204,7 +2255,7 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                       <button
                         key={opt.key}
                         type="button"
-                        onClick={() => handleTouchupPenSelect(opt.value, opt.color)}
+                        onClick={() => handleTouchupPenSelect(opt.value, opt.unit_price, opt.qty_available, opt.earliest_avail_date)}
                         style={{
                           display: "block",
                           width: "100%",
@@ -3652,6 +3703,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const buildLineItemsPayload = (items: LineItem[]) => {
     const result: any[] = [];
+    const vendor = selectedStoreOption.label.split(" ")[0];
     for (const item of items) {
       const properties = buildProperties(item);
       const activeParts = !washWholeUnit
@@ -3680,6 +3732,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 ? String(part.parts_unit_price)
                 : "0.00",
             sku: part.parts_item_no,
+            vendor,
             ...(partProps.length > 0 && { properties: partProps }),
           });
         }
@@ -3696,6 +3749,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
           title: item.description || item.item_no || "Custom Item",
           price: item.unit_price != null ? String(item.unit_price) : "0.00",
           sku: item.item_no || undefined,
+          vendor,
           ...(lineProps.length > 0 && { properties: lineProps }),
         });
       }

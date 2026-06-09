@@ -474,6 +474,31 @@ export const inventoryApi = createApi({
       },
     }),
 
+    getDistinctTouchupPens: builder.query<
+      any,
+      { search?: string; page_size?: number }
+    >({
+      query: ({ search = "", page_size = 50 }) => {
+        const params = new URLSearchParams();
+        params.set("search", search);
+        params.set("page_size", page_size.toString());
+        return `touchup_pen/distinct?${params.toString()}`;
+      },
+      transformResponse: (response: any) => {
+        const items = response?.data || [];
+        return {
+          results: Array.isArray(items)
+            ? items.map((item: any) => ({
+                item_num: item.item_num,
+                item_name_2: item.item_name_2 ?? null,
+                unit_price: item.unit_price != null ? Number(item.unit_price) : null,
+                qty_available: item.qty_available != null ? Number(item.qty_available) : null,
+              }))
+            : [],
+        };
+      },
+    }),
+
     getDistinctTouchupItems: builder.query<
       any,
       { parts_item_no?: string; page?: number; page_size?: number }
@@ -510,6 +535,7 @@ export const {
   useGetLocationItemLotQuery,
   useGetTouchupsQuery,
   useGetTouchupPensQuery,
+  useGetDistinctTouchupPensQuery,
   useGetDistinctTouchupItemsQuery,
   useGetLifeCycleStatusQuery,
   useGetNavETAQuery,
