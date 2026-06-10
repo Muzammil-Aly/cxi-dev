@@ -490,7 +490,7 @@ export const inventoryApi = createApi({
           results: Array.isArray(items)
             ? items.map((item: any) => ({
                 item_num: item.item_num,
-                item_name_2: item.item_name_2 ?? null,
+                item_name: item.item_name ?? null,
                 unit_price: item.unit_price != null ? Number(item.unit_price) : null,
                 qty_available: item.qty_available != null ? Number(item.qty_available) : null,
               }))

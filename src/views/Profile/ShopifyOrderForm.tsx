@@ -1457,7 +1457,9 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     qty_available: number | null;
     earliest_avail_date: string | null;
   }[] = (touchupPenData?.results ?? []).map((p: any, i: number) => {
-    const base = p.item_name_2 || p.item_num;
+    const rawName: string = p.item_name || p.item_num;
+    const dashIdx = rawName.indexOf(" - ");
+    const base = dashIdx >= 0 ? rawName.slice(dashIdx + 3) : rawName;
     const qtyPart = p.qty_available != null ? ` | Qty: ${p.qty_available}` : "";
     const pricePart = p.unit_price != null ? ` | $${Number(p.unit_price).toFixed(2)}` : "";
     return {
