@@ -1020,6 +1020,28 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
               ))}
             </div>
           )}
+          <button
+            type="button"
+            onClick={() =>
+              onPopulate({
+                item_no: "",
+                lot_no: pendingLotNo,
+                unit_price: null,
+              })
+            }
+            style={{
+              padding: "6px 10px",
+              border: "1.5px dashed #d1d5db",
+              borderRadius: "6px",
+              fontSize: "12px",
+              color: "#6b7280",
+              background: "transparent",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            Proceed without Item No
+          </button>
         </div>
       );
     }
@@ -1534,14 +1556,16 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     setDebouncedSku("");
   };
 
+  const touchupQueryArgs = {
+    isFromProps: true,
+    page_size: 100,
+    ...(item_no?.trim() ? { sku: item_no.trim() } : {}),
+    ...(lot_no?.trim() ? { lot_no: lot_no.trim() } : {}),
+  };
+
   const { data: touchupData, isFetching } = useGetTouchupsQuery(
-    {
-      sku: item_no || undefined,
-      lot_no: lot_no !== undefined ? (lot_no || null) : undefined,
-      isFromProps: true,
-      page_size: 100,
-    },
-    { skip: !expanded || !item_no },
+    touchupQueryArgs,
+    { skip: !expanded || (!item_no?.trim() && !lot_no?.trim()) },
   );
 
   const partPriceMap = new Map<string, number | null>(
@@ -2674,7 +2698,7 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
           gap: "10px",
         }}
       >
-        {item.title ? (
+        {(item.title || item.lot_no) ? (
           <>
             {/* Item No (read-only after selection) */}
             <div
@@ -2693,12 +2717,12 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
                   border: "1.5px solid #e5e7eb",
                   borderRadius: "8px",
                   fontSize: "13px",
-                  color: "#111827",
+                  color: item.title ? "#111827" : "#9ca3af",
                   background: "#f9fafb",
                   gap: "6px",
                 }}
               >
-                <span style={{ flex: 1 }}>{item.title}</span>
+                <span style={{ flex: 1 }}>{item.title || "—"}</span>
                 <button
                   type="button"
                   onClick={() => onUpdate({ title: "", lot_no: "", price: "" })}
@@ -3703,9 +3727,15 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     return props;
   };
 
+  const vendor = selectedStoreOption.label.split(" ")[0];
+
   const buildLineItemsPayload = (items: LineItem[]) => {
     const result: any[] = [];
-    const vendor = selectedStoreOption.label.split(" ")[0];
+    const storeLabel = selectedStoreOption.label;
+    const forcePartsZeroPrice =
+      !washWholeUnit &&
+      (storeLabel.startsWith("CP02") || storeLabel.startsWith("CP05"));
+
     for (const item of items) {
       const properties = buildProperties(item);
       const activeParts = !washWholeUnit
@@ -3729,12 +3759,12 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
           result.push({
             quantity: part.parts_qty,
             title: part.parts_item_no,
-            price:
-              part.parts_unit_price != null
+            price: forcePartsZeroPrice
+              ? "0.00"
+              : part.parts_unit_price != null
                 ? String(part.parts_unit_price)
                 : "0.00",
             sku: part.parts_item_no,
-            vendor,
             ...(partProps.length > 0 && { properties: partProps }),
           });
         }
@@ -3751,7 +3781,6 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
           title: item.description || item.item_no || "Custom Item",
           price: item.unit_price != null ? String(item.unit_price) : "0.00",
           sku: item.item_no || undefined,
-          vendor,
           ...(lineProps.length > 0 && { properties: lineProps }),
         });
       }
@@ -3799,6 +3828,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         washWholeUnit,
         lineItems: buildLineItemsPayload(form.lineItems),
         shippingAddress: form.shippingAddress,
+        vendor,
       }).unwrap();
       toast.success("Draft order created successfully!");
       // }
@@ -3850,6 +3880,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         orderId: editOrderId.trim(),
         store: selectedStore,
         ...buildEditBody(),
+        vendor,
       }).unwrap();
       toast.success("Order updated successfully!");
     } catch (err) {
@@ -3894,6 +3925,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         draftOrderId: editDraftOrderId.trim(),
         store: selectedStore,
         ...body,
+        vendor,
       }).unwrap();
       toast.success("Draft order updated successfully!");
     } catch (err) {
@@ -4011,6 +4043,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             customAttributes: [{ key: "reason_code", value: sharedReasonCode }],
           }
         : {}),
+      vendor,
     });
 
     if ("error" in result) {
@@ -4104,6 +4137,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         operations: allOps,
         notifyCustomer,
         staffNote: staffNote.trim() || undefined,
+        vendor,
       }).unwrap();
       setRemovedLineItemIds(new Set());
       setOperations([newOperation()]);
@@ -4882,7 +4916,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     gap: "10px",
                   }}
                 >
-                  {item.item_no ? (
+                  {(item.item_no || item.lot_no) ? (
                     <>
                       <div
                         style={{
@@ -4908,12 +4942,12 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                             border: "1.5px solid #e5e7eb",
                             borderRadius: "8px",
                             fontSize: "13px",
-                            color: "#111827",
+                            color: item.item_no ? "#111827" : "#9ca3af",
                             background: "#f9fafb",
                             gap: "6px",
                           }}
                         >
-                          <span style={{ flex: 1 }}>{item.item_no}</span>
+                          <span style={{ flex: 1 }}>{item.item_no || "—"}</span>
                           <button
                             type="button"
                             onClick={() =>

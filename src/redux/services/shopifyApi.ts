@@ -82,7 +82,6 @@ export const shopifyApi = createApi({
           title?: string;
           price?: string;
           sku?: string;
-          vendor?: string;
           properties?: { name: string; value: string }[];
         }[];
         shippingAddress: {
@@ -100,6 +99,7 @@ export const shopifyApi = createApi({
         inventoryBehaviour?: "BYPASS" | "DECREMENT" | "RELEASE";
         sendReceipt?: boolean;
         sendFulfillmentReceipt?: boolean;
+        vendor?: string;
       }
     >({
       query: ({
@@ -113,6 +113,7 @@ export const shopifyApi = createApi({
         inventoryBehaviour = "BYPASS",
         sendReceipt = false,
         sendFulfillmentReceipt = false,
+        vendor,
       }) => ({
         url: `/shopify/create-order?store=${store}`,
         method: "POST",
@@ -128,6 +129,7 @@ export const shopifyApi = createApi({
           inventoryBehaviour,
           sendReceipt,
           sendFulfillmentReceipt,
+          vendor,
         },
       }),
     }),
@@ -145,7 +147,6 @@ export const shopifyApi = createApi({
           title?: string;
           price?: string;
           sku?: string;
-          vendor?: string;
           properties?: { name: string; value: string }[];
         }[];
         shippingAddress: {
@@ -160,6 +161,7 @@ export const shopifyApi = createApi({
           zip: string;
           phone?: string;
         };
+        vendor?: string;
       }
     >({
       query: ({
@@ -170,6 +172,7 @@ export const shopifyApi = createApi({
         washWholeUnit = false,
         lineItems,
         shippingAddress,
+        vendor,
       }) => ({
         url: `/shopify/create-smart-draft-order?store=${store}`,
         method: "POST",
@@ -182,6 +185,7 @@ export const shopifyApi = createApi({
             lineItems,
             shippingAddress,
           },
+          vendor,
         },
       }),
     }),
@@ -206,6 +210,7 @@ export const shopifyApi = createApi({
         }>;
         customAttributes?: { key: string; value: string }[];
         tags?: string[];
+        vendor?: string;
       }
     >({
       query: ({
@@ -215,10 +220,11 @@ export const shopifyApi = createApi({
         shippingAddress,
         customAttributes,
         tags,
+        vendor,
       }) => ({
         url: `/shopify/order/${orderId}?store=${store}`,
         method: "PUT",
-        body: { email, shippingAddress, customAttributes, tags },
+        body: { email, shippingAddress, customAttributes, tags, vendor },
       }),
     }),
 
@@ -253,6 +259,7 @@ export const shopifyApi = createApi({
           lotNo?: string;
           itemNo?: string;
         }>;
+        vendor?: string;
       }
     >({
       query: ({
@@ -263,10 +270,11 @@ export const shopifyApi = createApi({
         customAttributes,
         tags,
         lineItems,
+        vendor,
       }) => ({
         url: `/shopify/draft-order/${draftOrderId}?store=${store}`,
         method: "PUT",
-        body: { email, shippingAddress, customAttributes, tags, lineItems },
+        body: { email, shippingAddress, customAttributes, tags, lineItems, vendor },
       }),
       invalidatesTags: (result, error, { draftOrderId }) => [
         { type: "DraftOrder", id: draftOrderId },
@@ -416,6 +424,7 @@ export const shopifyApi = createApi({
         }>;
         notifyCustomer?: boolean;
         staffNote?: string;
+        vendor?: string;
       }
     >({
       query: ({
@@ -424,10 +433,11 @@ export const shopifyApi = createApi({
         operations,
         notifyCustomer,
         staffNote,
+        vendor,
       }) => ({
         url: `/shopify/order/${orderId}/edit?store=${store}`,
         method: "POST",
-        body: { operations, notifyCustomer, staffNote },
+        body: { operations, notifyCustomer, staffNote, vendor },
       }),
     }),
 
