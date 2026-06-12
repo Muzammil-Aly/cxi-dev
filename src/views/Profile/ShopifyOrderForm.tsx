@@ -76,6 +76,7 @@ interface LineItem {
   customSku?: string;
   customProductType?: string;
   customVendor?: string;
+  isExistingOrderLine?: boolean;
 }
 
 interface OrderFormState {
@@ -119,6 +120,7 @@ interface DraftNewCustomItem {
   reasonCode: string;
   returnReasonCode: string;
   parts: PartRow[];
+  isExistingOrderLine?: boolean;
 }
 
 interface EditOperation {
@@ -2782,22 +2784,24 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
                 }}
               >
                 <span style={{ flex: 1 }}>{item.title || "—"}</span>
-                <button
-                  type="button"
-                  onClick={() => onUpdate({ title: "", lot_no: "", price: "" })}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "#9ca3af",
-                    fontSize: "14px",
-                    lineHeight: 1,
-                    padding: 0,
-                  }}
-                  title="Clear item / lot"
-                >
-                  ×
-                </button>
+                {!item.isExistingOrderLine && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdate({ title: "", lot_no: "", price: "" })}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "#9ca3af",
+                      fontSize: "14px",
+                      lineHeight: 1,
+                      padding: 0,
+                    }}
+                    title="Clear item / lot"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
             </div>
 
@@ -3640,6 +3644,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       lot_no: row.lot_no ?? undefined,
       unit_price: row.unit_price ?? null,
       description: row.description || null,
+      isExistingOrderLine: true,
       // pre-populate custom fields for use in the confirm modal (not auto-ticked)
       ...(isUnmatched && {
         customTitle: row.description || row.item_no || "",
@@ -3695,6 +3700,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       reasonCode: "",
       returnReasonCode: "",
       parts: [],
+      isExistingOrderLine: true,
     };
     setDraftNewCustomItems((prev) => [...prev, newItem]);
   };
@@ -3759,7 +3765,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     setLineItemProductIds((prev) => [...prev, null]);
     setForm((prev) => ({
       ...prev,
-      lineItems: [...prev.lineItems, { variantId: "", quantity: 1 }],
+      lineItems: [...prev.lineItems, { variantId: "", quantity: 1, isExistingOrderLine: false }],
     }));
   };
 
@@ -5005,33 +5011,35 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                           }}
                         >
                           <span style={{ flex: 1 }}>{item.item_no || "—"}</span>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setForm((prev) => {
-                                const updated = [...prev.lineItems];
-                                updated[index] = {
-                                  ...updated[index],
-                                  item_no: undefined,
-                                  lot_no: null,
-                                  unit_price: null,
-                                };
-                                return { ...prev, lineItems: updated };
-                              })
-                            }
-                            style={{
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              color: "#9ca3af",
-                              fontSize: "14px",
-                              lineHeight: 1,
-                              padding: 0,
-                            }}
-                            title="Clear item / lot"
-                          >
-                            ×
-                          </button>
+                          {!item.isExistingOrderLine && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setForm((prev) => {
+                                  const updated = [...prev.lineItems];
+                                  updated[index] = {
+                                    ...updated[index],
+                                    item_no: undefined,
+                                    lot_no: null,
+                                    unit_price: null,
+                                  };
+                                  return { ...prev, lineItems: updated };
+                                })
+                              }
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                color: "#9ca3af",
+                                fontSize: "14px",
+                                lineHeight: 1,
+                                padding: 0,
+                              }}
+                              title="Clear item / lot"
+                            >
+                              ×
+                            </button>
+                          )}
                         </div>
                       </div>
                       <div
