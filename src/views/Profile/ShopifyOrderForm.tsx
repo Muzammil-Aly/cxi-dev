@@ -168,53 +168,52 @@ const STORE_OPTIONS: {
 
   {
     value: "store1",
-    label: "CP02 -mdbco",
-    tag: "CP02 -mdbco",
-    handle: "mdbco-test",
+    label: "CP02-replacement/warranty_parts",
+    tag: "CP02-replacement/warranty_parts",
+    handle: "CP02-replacement/warranty_parts",
   },
   {
     value: "store1",
-    label: "CP03 -mdbco",
-    tag: "CP03 -mdbco",
-    handle: "mdbco-test",
+    label: "CP03-consumer_parts_sales",
+    tag: "CP03-consumer_parts_sales",
+    handle: "CP03-consumer_parts_sales",
   },
   {
     value: "store1",
-    label: "CP05 -mdbco",
-    tag: "CP05 -mdbco",
-    handle: "mdbco-test",
+    label: "CP05-replacement/warranty_parts_consumer_wow",
+    tag: "CP05-replacement/warranty_parts_consumer_wow",
+    handle: "CP05-replacement/warranty_parts_consumer_wow",
   },
   {
     value: "store1",
-    label: "CP010 -mdbco",
-    tag: "CP010 -mdbco",
-    handle: "mdbco-test",
+    label: "CP010-cs_care",
+    tag: "CP010-cs_care",
+    handle: "CP010-cs_care",
   },
   {
     value: "store2",
-    label: "CP55 -babyletto",
-    tag: "CP55 -babyletto",
+    label: "CP55-babyletto",
+    tag: "CP55-babyletto",
     handle: "mdbco-test",
   },
   {
     value: "store3",
-    label: "CP66 - namesake",
-    tag: "CP66 - namesake",
+    label: "CP66-namesake",
+    tag: "CP66-namesake",
     handle: "xxx",
   },
   {
     value: "store4",
-    label: "CP77 -davincibaby",
-    tag: "CP77 -davincibaby",
+    label: "CP77-davincibaby",
+    tag: "CP77-davincibaby",
     handle: "",
   },
   {
     value: "store5",
-    label: "CP99 -  nurseryworks",
-    tag: "CP99 -  nurseryworks",
+    label: "CP99-nurseryworks",
+    tag: "CP99-nurseryworks",
     handle: "",
   },
-  { value: "store3", label: "Store 3", tag: "Store 3", handle: "xxx" },
 ];
 
 interface StoreOption {
@@ -715,13 +714,13 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
 
   const [showLotDropdown, setShowLotDropdown] = useState(false);
 
-
   const [pendingItemNo, setPendingItemNo] = useState<string | null>(null);
   const [pendingLotNo, setPendingLotNo] = useState<string | null>(null);
   const [pendingPrice, setPendingPrice] = useState<number | null>(null);
 
   const [lotForItemSearch, setLotForItemSearch] = useState("");
-  const [debouncedLotForItemSearch, setDebouncedLotForItemSearch] = useState("");
+  const [debouncedLotForItemSearch, setDebouncedLotForItemSearch] =
+    useState("");
 
   const itemRef = useRef<HTMLDivElement>(null);
   const lotRef = useRef<HTMLDivElement>(null);
@@ -803,7 +802,10 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
   const { data: lotsForItemData, isFetching: isFetchingLotsForItem } =
     useGetTouchupsQuery(
       { sku: pendingItemNo!, isFromProps: false, page_size: 100 },
-      { skip: !pendingItemNo || !!pendingLotNo, refetchOnMountOrArgChange: true },
+      {
+        skip: !pendingItemNo || !!pendingLotNo,
+        refetchOnMountOrArgChange: true,
+      },
     );
 
   // Search lots scoped to the selected item
@@ -815,7 +817,13 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
         isFromProps: false,
         page_size: 50,
       },
-      { skip: !pendingItemNo || debouncedLotForItemSearch.length < 2 || !!pendingLotNo, refetchOnMountOrArgChange: true },
+      {
+        skip:
+          !pendingItemNo ||
+          debouncedLotForItemSearch.length < 2 ||
+          !!pendingLotNo,
+        refetchOnMountOrArgChange: true,
+      },
     );
 
   // Get available items for a selected lot
@@ -1202,7 +1210,9 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
       const showLotForItemLoader =
         isLotForItemTyping || isSearchingLotsForItem || isFetchingLotsForItem;
       const isSearching = debouncedLotForItemSearch.length >= 2;
-      const displayedLots = isSearching ? lotsForItemSearchResults : lotsForItem;
+      const displayedLots = isSearching
+        ? lotsForItemSearchResults
+        : lotsForItem;
 
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -1255,17 +1265,19 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
           )}
 
           {/* No results for search */}
-          {isSearching && !showLotForItemLoader && lotsForItemSearchResults.length === 0 && (
-            <div
-              style={{
-                fontSize: "12px",
-                color: "#9ca3af",
-                padding: "4px 2px",
-              }}
-            >
-              No lots found
-            </div>
-          )}
+          {isSearching &&
+            !showLotForItemLoader &&
+            lotsForItemSearchResults.length === 0 && (
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#9ca3af",
+                  padding: "4px 2px",
+                }}
+              >
+                No lots found
+              </div>
+            )}
 
           <button
             type="button"
@@ -1461,8 +1473,7 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     useGetDistinctTouchupPensQuery(
       { search: debouncedTouchupPenSearch, page_size: 50 },
       {
-        skip:
-          !touchupPenSearchEnabled || debouncedTouchupPenSearch.length < 2,
+        skip: !touchupPenSearchEnabled || debouncedTouchupPenSearch.length < 2,
       },
     );
 
@@ -1483,7 +1494,8 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     const dashIdx = rawName.indexOf(" - ");
     const base = dashIdx >= 0 ? rawName.slice(dashIdx + 3) : rawName;
     const qtyPart = p.qty_available != null ? ` | Qty: ${p.qty_available}` : "";
-    const pricePart = p.unit_price != null ? ` | $${Number(p.unit_price).toFixed(2)}` : "";
+    const pricePart =
+      p.unit_price != null ? ` | $${Number(p.unit_price).toFixed(2)}` : "";
     return {
       value: p.item_num,
       label: `${p.item_num} — ${base}${qtyPart}${pricePart}`,
@@ -1516,8 +1528,7 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
   };
 
   const isCustomTyping =
-    customSkuTerm.trim().length >= 2 &&
-    customSkuTerm.trim() !== debouncedSku;
+    customSkuTerm.trim().length >= 2 && customSkuTerm.trim() !== debouncedSku;
   const showCustomLoader = isCustomTyping || isCustomFetching;
 
   const customOptions: {
@@ -1533,7 +1544,9 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     price: p.unit_price != null ? Number(p.unit_price) : null,
     lot_no: p.lot_no ?? null,
     potential_qty_available:
-      p.potential_qty_available != null ? Number(p.potential_qty_available) : null,
+      p.potential_qty_available != null
+        ? Number(p.potential_qty_available)
+        : null,
     earliest_avail_date: p.earliest_avail_date ?? null,
   }));
 
@@ -1549,7 +1562,13 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
     const earliest_avail_date = found?.earliest_avail_date ?? null;
     onChange([
       ...parts,
-      { parts_item_no: val, parts_qty: 1, parts_unit_price: price, potential_qty_available, earliest_avail_date },
+      {
+        parts_item_no: val,
+        parts_qty: 1,
+        parts_unit_price: price,
+        potential_qty_available,
+        earliest_avail_date,
+      },
     ]);
     setCustomAddEnabled(false);
     setCustomSkuTerm("");
@@ -1578,7 +1597,9 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
   const partQtyAvailableMap = new Map<string, number | null>(
     (touchupData?.data ?? []).map((p: any) => [
       p.parts_item_no,
-      p.potential_qty_available != null ? Number(p.potential_qty_available) : null,
+      p.potential_qty_available != null
+        ? Number(p.potential_qty_available)
+        : null,
     ]),
   );
 
@@ -1604,9 +1625,18 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
 
   const selectPartForRow = (i: number, val: string) => {
     const price = partPriceMap.has(val) ? partPriceMap.get(val)! : null;
-    const potential_qty_available = partQtyAvailableMap.has(val) ? partQtyAvailableMap.get(val)! : null;
-    const earliest_avail_date = partEarliestAvailDateMap.has(val) ? partEarliestAvailDateMap.get(val)! : null;
-    updateRow(i, { parts_item_no: val, parts_unit_price: price, potential_qty_available, earliest_avail_date });
+    const potential_qty_available = partQtyAvailableMap.has(val)
+      ? partQtyAvailableMap.get(val)!
+      : null;
+    const earliest_avail_date = partEarliestAvailDateMap.has(val)
+      ? partEarliestAvailDateMap.get(val)!
+      : null;
+    updateRow(i, {
+      parts_item_no: val,
+      parts_unit_price: price,
+      potential_qty_available,
+      earliest_avail_date,
+    });
   };
 
   const addRow = () => onChange([...parts, EMPTY_PART()]);
@@ -1798,7 +1828,9 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                         onChange={(val) => selectPartForRow(i, val)}
                         options={
                           row.parts_item_no &&
-                          !partsOptions.find((o) => o.value === row.parts_item_no)
+                          !partsOptions.find(
+                            (o) => o.value === row.parts_item_no,
+                          )
                             ? [
                                 ...partsOptions,
                                 {
@@ -1848,12 +1880,18 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                     <div
                       style={{
                         ...fieldStyle,
-                        color: (row.potential_qty_available ?? partQtyAvailableMap.get(row.parts_item_no)) != null ? "#111827" : "#9ca3af",
+                        color:
+                          (row.potential_qty_available ??
+                            partQtyAvailableMap.get(row.parts_item_no)) != null
+                            ? "#111827"
+                            : "#9ca3af",
                         background: "#f3f4f6",
                         cursor: "not-allowed",
                       }}
                     >
-                      {(row.potential_qty_available ?? partQtyAvailableMap.get(row.parts_item_no)) ?? "—"}
+                      {row.potential_qty_available ??
+                        partQtyAvailableMap.get(row.parts_item_no) ??
+                        "—"}
                     </div>
                   </div>
                   <div
@@ -1875,12 +1913,18 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                     <div
                       style={{
                         ...fieldStyle,
-                        color: (row.earliest_avail_date ?? partEarliestAvailDateMap.get(row.parts_item_no)) ? "#111827" : "#9ca3af",
+                        color:
+                          (row.earliest_avail_date ??
+                          partEarliestAvailDateMap.get(row.parts_item_no))
+                            ? "#111827"
+                            : "#9ca3af",
                         background: "#f3f4f6",
                         cursor: "not-allowed",
                       }}
                     >
-                      {(row.earliest_avail_date ?? partEarliestAvailDateMap.get(row.parts_item_no)) || "—"}
+                      {(row.earliest_avail_date ??
+                        partEarliestAvailDateMap.get(row.parts_item_no)) ||
+                        "—"}
                     </div>
                   </div>
                 </div>
@@ -2163,9 +2207,18 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                         }
                       >
                         <span style={{ fontWeight: 600 }}>{opt.label}</span>
-                        <span style={{ display: "flex", gap: "12px", fontSize: "11px", color: "#6b7280" }}>
+                        <span
+                          style={{
+                            display: "flex",
+                            gap: "12px",
+                            fontSize: "11px",
+                            color: "#6b7280",
+                          }}
+                        >
                           <span>Lot: {opt.lot_no ?? "—"}</span>
-                          <span>QTY Available: {opt.potential_qty_available ?? "—"}</span>
+                          <span>
+                            QTY Available: {opt.potential_qty_available ?? "—"}
+                          </span>
                           {opt.price != null && (
                             <span style={{ color: "#059669", fontWeight: 600 }}>
                               ${opt.price.toFixed(2)}
@@ -2281,7 +2334,14 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
                       <button
                         key={opt.key}
                         type="button"
-                        onClick={() => handleTouchupPenSelect(opt.value, opt.unit_price, opt.qty_available, opt.earliest_avail_date)}
+                        onClick={() =>
+                          handleTouchupPenSelect(
+                            opt.value,
+                            opt.unit_price,
+                            opt.qty_available,
+                            opt.earliest_avail_date,
+                          )
+                        }
                         style={{
                           display: "block",
                           width: "100%",
@@ -2313,7 +2373,6 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
               </div>
             )}
           </div>
-
         </div>
       )}
     </div>
@@ -2698,7 +2757,7 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
           gap: "10px",
         }}
       >
-        {(item.title || item.lot_no) ? (
+        {item.title || item.lot_no ? (
           <>
             {/* Item No (read-only after selection) */}
             <div
@@ -3727,7 +3786,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     return props;
   };
 
-  const vendor = selectedStoreOption.label.split(" ")[0];
+  const getStoreCode = (storeName: string) => storeName.split("-")[0].trim().replace(/\s+/g, "");
+  const vendor = getStoreCode(selectedStoreOption.label);
 
   const buildLineItemsPayload = (items: LineItem[]) => {
     const result: any[] = [];
@@ -3947,8 +4007,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     // - New custom items with reason codes (title required, OR parts-only items)
     const validNewCustom = draftNewCustomItems.filter(
       (li) =>
-        (!draftWashWholeUnit &&
-          li.parts.some((p) => p.parts_item_no.trim())) ||
+        (!draftWashWholeUnit && li.parts.some((p) => p.parts_item_no.trim())) ||
         (li.title.trim() && li.quantity > 0),
     );
 
@@ -3979,9 +4038,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             ...(li.title ? { itemNo: li.title } : {}),
             ...(li.lot_no ? { lotNo: li.lot_no } : {}),
             sku: part.parts_item_no,
-            ...(part.touchup_color
-              ? { touchupColor: part.touchup_color }
-              : {}),
+            ...(part.touchup_color ? { touchupColor: part.touchup_color } : {}),
           });
         }
       } else {
@@ -4916,7 +4973,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     gap: "10px",
                   }}
                 >
-                  {(item.item_no || item.lot_no) ? (
+                  {item.item_no || item.lot_no ? (
                     <>
                       <div
                         style={{
@@ -7663,18 +7720,28 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                           padding: "10px 14px",
                           borderRadius: "10px",
                           border: `1.5px solid ${item.pendingRemove ? "#fca5a5" : "#e5e7eb"}`,
-                          background: item.pendingRemove ? "#fff7f7" : "#fafafa",
+                          background: item.pendingRemove
+                            ? "#fff7f7"
+                            : "#fafafa",
                           opacity: item.pendingRemove ? 0.75 : 1,
                         }}
                       >
                         {/* Title + attributes */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "3px",
+                          }}
+                        >
                           <span
                             style={{
                               fontWeight: 700,
                               fontSize: "13px",
                               color: item.pendingRemove ? "#dc2626" : "#111827",
-                              textDecoration: item.pendingRemove ? "line-through" : "none",
+                              textDecoration: item.pendingRemove
+                                ? "line-through"
+                                : "none",
                             }}
                           >
                             {item.title}
@@ -7682,9 +7749,17 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                           {item.customAttributes.map((attr) => (
                             <span
                               key={attr.key}
-                              style={{ fontSize: "11px", color: "#6b7280", lineHeight: 1.4 }}
+                              style={{
+                                fontSize: "11px",
+                                color: "#6b7280",
+                                lineHeight: 1.4,
+                              }}
                             >
-                              <span style={{ fontWeight: 600, color: "#374151" }}>{attr.key}:</span>{" "}
+                              <span
+                                style={{ fontWeight: 600, color: "#374151" }}
+                              >
+                                {attr.key}:
+                              </span>{" "}
                               {attr.value}
                             </span>
                           ))}
@@ -7747,12 +7822,19 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                           />
                           <button
                             type="button"
-                            title={item.pendingRemove ? "Undo removal" : "Remove item"}
+                            title={
+                              item.pendingRemove
+                                ? "Undo removal"
+                                : "Remove item"
+                            }
                             onClick={() =>
                               setDraftCustomItems((prev) =>
                                 prev.map((li, idx) =>
                                   idx === i
-                                    ? { ...li, pendingRemove: !li.pendingRemove }
+                                    ? {
+                                        ...li,
+                                        pendingRemove: !li.pendingRemove,
+                                      }
                                     : li,
                                 ),
                               )
