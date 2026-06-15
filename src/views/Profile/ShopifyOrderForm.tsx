@@ -166,8 +166,6 @@ const STORE_OPTIONS: {
   handle: string;
 }[] = [
   // { value: "store1", label: "Testing", tag: "Testing", handle: "testoneabc" },
-  { value: "store1", label: "MDB CO", tag: "Testing", handle: "mdbco-test" },
-
   {
     value: "store1",
     label: "CP02-replacement/warranty_parts",
@@ -188,9 +186,9 @@ const STORE_OPTIONS: {
   },
   {
     value: "store1",
-    label: "CP010-cs_care",
-    tag: "CP010-cs_care",
-    handle: "CP010-cs_care",
+    label: "CP10-cs_care",
+    tag: "CP10-cs_care",
+    handle: "CP10-cs_care",
   },
   {
     value: "store2",
@@ -272,7 +270,9 @@ const StoreDropdown: React.FC<StoreDropdownProps> = ({
           transition: "border-color 0.15s",
         }}
       >
-        <span>{selected?.label}</span>
+        <span style={{ color: selected ? "#111827" : "#9ca3af" }}>
+          {selected?.label ?? "— select Store —"}
+        </span>
         <svg
           width="16"
           height="16"
@@ -3044,11 +3044,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   const [editSubTab, setEditSubTab] = useState<EditSubTab>("details");
 
   // ── Store (shared) ────────────────────────────────────────────────────────
-  const [selectedStoreOption, setSelectedStoreOption] = useState<StoreOption>(
-    STORE_OPTIONS[0],
-  );
-  const selectedStore = selectedStoreOption.value;
-  const selectedTag = selectedStoreOption.tag;
+  const [selectedStoreOption, setSelectedStoreOption] =
+    useState<StoreOption | null>(null);
+  const selectedStore = selectedStoreOption?.value;
+  const selectedTag = selectedStoreOption?.tag ?? "";
 
   // ── Create mode: order search ─────────────────────────────────────────────
   const [orderSearchInput, setOrderSearchInput] = useState("");
@@ -3139,7 +3138,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     data: products,
     isLoading: productsLoading,
     refetch: refetchProducts,
-  } = useGetProductsQuery(selectedStore);
+  } = useGetProductsQuery(selectedStore!, { skip: !selectedStore });
 
   const variantOptions = useMemo<VariantOption[]>(() => {
     if (!products) return [];
@@ -3193,14 +3192,14 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     return trimmed;
   };
 
-  const { data: editShopifyOrdersData, isFetching: isEditOrderSearching } =
+  const { data: editShopifyOrdersData, isFetching: isEditOrderSearching, isError: isEditOrdersError } =
     useGetShopifyOrdersQuery(
-      { store: selectedStore, limit: 50, query: editSearchFilter },
-      { skip: mode !== "editOrder" },
+      { store: selectedStore!, limit: 50, query: editSearchFilter },
+      { skip: !selectedStore || mode !== "editOrder" },
     );
   const editOrderSuggestions = useMemo(
-    () => editShopifyOrdersData?.data || [],
-    [editShopifyOrdersData],
+    () => (isEditOrdersError ? [] : editShopifyOrdersData?.data || []),
+    [editShopifyOrdersData, isEditOrdersError],
   );
 
   const handleSelectEditOrder = (order: any, isDraft = false) => {
@@ -3245,14 +3244,14 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     null,
   );
 
-  const { data: editDraftOrdersData, isFetching: isDraftOrderSearching } =
+  const { data: editDraftOrdersData, isFetching: isDraftOrderSearching, isError: isDraftOrdersError } =
     useGetShopifyDraftOrdersQuery(
-      { store: selectedStore, limit: 50, query: draftSearchFilter },
-      { skip: mode !== "editDraft" },
+      { store: selectedStore!, limit: 50, query: draftSearchFilter },
+      { skip: !selectedStore || mode !== "editDraft" },
     );
   const draftOrderSuggestions = useMemo(
-    () => editDraftOrdersData?.data || [],
-    [editDraftOrdersData],
+    () => (isDraftOrdersError ? [] : editDraftOrdersData?.data || []),
+    [editDraftOrdersData, isDraftOrdersError],
   );
 
   const handleSelectDraftOrder = (order: any) => {
@@ -3325,8 +3324,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     isError: _isLineItemsError,
     refetch: refetchLineItems,
   } = useGetOrderLineItemsQuery(
-    { orderId: loadLineItemsOrderId, store: selectedStore },
-    { skip: !loadLineItemsOrderId, refetchOnMountOrArgChange: true },
+    { orderId: loadLineItemsOrderId, store: selectedStore! },
+    { skip: !loadLineItemsOrderId || !selectedStore, refetchOnMountOrArgChange: true },
   );
 
   // Force refetch when the same order is re-selected (cache bypass)
@@ -3393,8 +3392,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     isFetching: isLoadingDraftLineItems,
     refetch: refetchDraftLineItems,
   } = useGetDraftOrderLineItemsQuery(
-    { draftOrderId: loadDraftLineItemsId, store: selectedStore },
-    { skip: !loadDraftLineItemsId, refetchOnMountOrArgChange: true },
+    { draftOrderId: loadDraftLineItemsId, store: selectedStore! },
+    { skip: !loadDraftLineItemsId || !selectedStore, refetchOnMountOrArgChange: true },
   );
 
   // Force refetch when the same draft order is re-selected (cache bypass)
@@ -3472,8 +3471,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   // ── Edit eligibility check ────────────────────────────────────────────────
   const { data: editEligibility, isFetching: isCheckingEligibility } =
     useGetOrderEditEligibilityQuery(
-      { orderId: editOrderId, store: selectedStore },
-      { skip: !editOrderId.trim() || mode !== "editOrder" },
+      { orderId: editOrderId, store: selectedStore! },
+      { skip: !selectedStore || !editOrderId.trim() || mode !== "editOrder" },
     );
   const [editSelectedOrder, setEditSelectedOrder] = useState<any>(null);
   const [removedLineItemIds, setRemovedLineItemIds] = useState<Set<string>>(
@@ -3651,7 +3650,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         customSku: row.item_no || "",
         customProductType: row.lot_no || "",
         customPrice: row.unit_price != null ? String(row.unit_price) : "",
-        customVendor: selectedStoreOption.label,
+        customVendor: selectedStoreOption?.label ?? "",
       }),
     };
 
@@ -3793,11 +3792,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   };
 
   const getStoreCode = (storeName: string) => storeName.split("-")[0].trim().replace(/\s+/g, "");
-  const vendor = getStoreCode(selectedStoreOption.label);
+  const vendor = getStoreCode(selectedStoreOption?.label ?? "");
 
   const buildLineItemsPayload = (items: LineItem[]) => {
     const result: any[] = [];
-    const storeLabel = selectedStoreOption.label;
+    const storeLabel = selectedStoreOption?.label ?? "";
     const forcePartsZeroPrice =
       !washWholeUnit &&
       (storeLabel.startsWith("CP02") || storeLabel.startsWith("CP05"));
@@ -3869,6 +3868,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedStoreOption) {
+      toast.error("Please select a store first.");
+      return;
+    }
     // const shouldCreateOrder = washWholeUnit || allPricesZero(form.lineItems);
     try {
       // if (shouldCreateOrder) {
@@ -3885,8 +3888,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       //   toast.success("Order created successfully!");
       // } else {
       const draftTags = washWholeUnit
-        ? [selectedTag, "cxi-washwholeunit"]
-        : [selectedTag];
+        ? ["cxi-washwholeunit"]
+        : [];
       await createDraftOrder({
         store: selectedStore,
         email: form.email,
@@ -3937,6 +3940,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleUpdateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedStoreOption) {
+      toast.error("Please select a store first.");
+      return;
+    }
     if (!editOrderId.trim()) {
       toast.error("Please enter an Order ID");
       return;
@@ -3956,6 +3963,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleUpdateDraft = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedStoreOption) {
+      toast.error("Please select a store first.");
+      return;
+    }
     if (!editDraftOrderId.trim()) {
       toast.error("Please enter a Draft Order ID");
       return;
@@ -4001,6 +4012,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleUpdateDraftLineItems = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedStoreOption) {
+      toast.error("Please select a store first.");
+      return;
+    }
     if (!editDraftOrderId.trim()) {
       toast.error("Please select a draft order first.");
       return;
@@ -4135,6 +4150,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleEditLineItems = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedStoreOption) {
+      toast.error("Please select a store first.");
+      return;
+    }
     if (!editOrderId.trim()) {
       toast.error("Please enter an Order ID");
       return;
@@ -4213,6 +4232,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   const handleCancelOrder = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!selectedStoreOption) {
+      toast.error("Please select a store first.");
+      return;
+    }
     if (!editOrderId.trim()) {
       toast.error("Please select an order first.");
       return;
@@ -4607,7 +4630,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             <div style={fieldWrap}>
               <label style={labelStyle}>Store *</label>
               <StoreDropdown
-                selectedLabel={selectedStoreOption.label}
+                selectedLabel={selectedStoreOption?.label ?? ""}
                 onChange={(opt) => setSelectedStoreOption(opt)}
                 options={STORE_OPTIONS}
               />
@@ -4644,6 +4667,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 options={reasonCodeOptions}
                 placeholder="— select reason code —"
               />
+              {selectedReasonCode && `cxi-rc_${selectedReasonCode}`.length > 40 && (
+                <span style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626" }}>
+                  Tag limit exceeded: "cxi-rc_{selectedReasonCode}" is {`cxi-rc_${selectedReasonCode}`.length} characters (max 40).
+                </span>
+              )}
             </div>
             <div style={fieldWrap}>
               <label style={labelStyle}>
@@ -4659,6 +4687,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 value={selectedExternalDocInfo}
                 onChange={(e) => setSelectedExternalDocInfo(e.target.value)}
               />
+              {`zendesk_${selectedExternalDocInfo}`.length > 40 && (
+                <span style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626" }}>
+                  Tag limit exceeded: "zendesk_{selectedExternalDocInfo}" is {`zendesk_${selectedExternalDocInfo}`.length} characters (max 40).
+                </span>
+              )}
             </div>
             <div
               style={{
@@ -5465,8 +5498,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             data={data}
             error={error}
             adminUrl={
-              data?.data?.id && selectedStoreOption.handle
-                ? `https://admin.shopify.com/store/${selectedStoreOption.handle}/orders/${data.data.id.split("/").pop()}`
+              data?.data?.id && selectedStoreOption?.handle
+                ? `https://admin.shopify.com/store/${selectedStoreOption?.handle}/orders/${data.data.id.split("/").pop()}`
                 : undefined
             }
           />
@@ -5476,8 +5509,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             successColor="#0369a1"
             successBg="#f0f9ff"
             adminUrl={
-              draftData?.data?.id && selectedStoreOption.handle
-                ? `https://admin.shopify.com/store/${selectedStoreOption.handle}/draft_orders/${draftData.data.id.split("/").pop()}`
+              draftData?.data?.id && selectedStoreOption?.handle
+                ? `https://admin.shopify.com/store/${selectedStoreOption?.handle}/draft_orders/${draftData.data.id.split("/").pop()}`
                 : undefined
             }
           />
@@ -5691,7 +5724,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             <div style={fieldWrap}>
               <label style={labelStyle}>Store *</label>
               <StoreDropdown
-                selectedLabel={selectedStoreOption.label}
+                selectedLabel={selectedStoreOption?.label ?? ""}
                 onChange={(opt) => setSelectedStoreOption(opt)}
                 options={STORE_OPTIONS}
               />
@@ -5831,6 +5864,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   value={editTags}
                   onChange={(e) => setEditTags(e.target.value)}
                 />
+                {editTags.split(",").map((t) => t.trim()).filter((t) => t.length > 40).map((t) => (
+                  <span key={t} style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626", display: "block" }}>
+                    Tag limit exceeded: "{t}" is {t.length} characters (max 40).
+                  </span>
+                ))}
               </div>
 
               {/* Custom Attributes */}
@@ -5962,8 +6000,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 data={updateData}
                 error={updateError}
                 adminUrl={
-                  updateData?.data?.id && selectedStoreOption.handle
-                    ? `https://admin.shopify.com/store/${selectedStoreOption.handle}/orders/${updateData.data.id.split("/").pop()}`
+                  updateData?.data?.id && selectedStoreOption?.handle
+                    ? `https://admin.shopify.com/store/${selectedStoreOption?.handle}/orders/${updateData.data.id.split("/").pop()}`
                     : undefined
                 }
               />
@@ -6657,7 +6695,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
                   {editData.order?.id && (
                     <a
-                      href={`https://admin.shopify.com/store/${selectedStoreOption.handle}/orders/${editData.order.id.split("/").pop()}`}
+                      href={`https://admin.shopify.com/store/${selectedStoreOption?.handle}/orders/${editData.order.id.split("/").pop()}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       style={{
@@ -7054,7 +7092,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             <div style={fieldWrap}>
               <label style={labelStyle}>Store *</label>
               <StoreDropdown
-                selectedLabel={selectedStoreOption.label}
+                selectedLabel={selectedStoreOption?.label ?? ""}
                 onChange={(opt) => setSelectedStoreOption(opt)}
                 options={STORE_OPTIONS}
               />
@@ -7132,6 +7170,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   value={editTags}
                   onChange={(e) => setEditTags(e.target.value)}
                 />
+                {editTags.split(",").map((t) => t.trim()).filter((t) => t.length > 40).map((t) => (
+                  <span key={t} style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626", display: "block" }}>
+                    Tag limit exceeded: "{t}" is {t.length} characters (max 40).
+                  </span>
+                ))}
               </div>
 
               {/* Reason Code */}
@@ -7156,12 +7199,19 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     This draft order is completed and cannot be updated.
                   </div>
                 ) : (
-                  <SearchableDropdown
-                    value={draftEditReasonCode}
-                    onChange={(val) => setDraftEditReasonCode(val)}
-                    options={reasonCodeOptions}
-                    placeholder="— select reason code —"
-                  />
+                  <>
+                    <SearchableDropdown
+                      value={draftEditReasonCode}
+                      onChange={(val) => setDraftEditReasonCode(val)}
+                      options={reasonCodeOptions}
+                      placeholder="— select reason code —"
+                    />
+                    {draftEditReasonCode && `cxi-rc_${draftEditReasonCode}`.length > 40 && (
+                      <span style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626" }}>
+                        Tag limit exceeded: "cxi-rc_{draftEditReasonCode}" is {`cxi-rc_${draftEditReasonCode}`.length} characters (max 40).
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -7187,15 +7237,22 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     This draft order is completed and cannot be updated.
                   </div>
                 ) : (
-                  <input
-                    style={inputStyle}
-                    type="text"
-                    placeholder="zendesk_"
-                    value={draftEditExternalDocInfo}
-                    onChange={(e) =>
-                      setDraftEditExternalDocInfo(e.target.value)
-                    }
-                  />
+                  <>
+                    <input
+                      style={inputStyle}
+                      type="text"
+                      placeholder="zendesk_"
+                      value={draftEditExternalDocInfo}
+                      onChange={(e) =>
+                        setDraftEditExternalDocInfo(e.target.value)
+                      }
+                    />
+                    {`zendesk_${draftEditExternalDocInfo}`.length > 40 && (
+                      <span style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626" }}>
+                        Tag limit exceeded: "zendesk_{draftEditExternalDocInfo}" is {`zendesk_${draftEditExternalDocInfo}`.length} characters (max 40).
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -7239,8 +7296,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 successColor="#0369a1"
                 successBg="#f0f9ff"
                 adminUrl={
-                  updateDraftData?.data?.id && selectedStoreOption.handle
-                    ? `https://admin.shopify.com/store/${selectedStoreOption.handle}/draft_orders/${updateDraftData.data.id.split("/").pop()}`
+                  updateDraftData?.data?.id && selectedStoreOption?.handle
+                    ? `https://admin.shopify.com/store/${selectedStoreOption?.handle}/draft_orders/${updateDraftData.data.id.split("/").pop()}`
                     : undefined
                 }
               />
@@ -8124,8 +8181,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 successColor="#0369a1"
                 successBg="#f0f9ff"
                 adminUrl={
-                  updateDraftData?.data?.id && selectedStoreOption.handle
-                    ? `https://admin.shopify.com/store/${selectedStoreOption.handle}/draft_orders/${updateDraftData.data.id.split("/").pop()}`
+                  updateDraftData?.data?.id && selectedStoreOption?.handle
+                    ? `https://admin.shopify.com/store/${selectedStoreOption?.handle}/draft_orders/${updateDraftData.data.id.split("/").pop()}`
                     : undefined
                 }
               />
@@ -8206,7 +8263,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
           <div style={{ marginBottom: "20px" }}>
             <label style={labelStyle}>Store</label>
             <StoreDropdown
-              selectedLabel={selectedStoreOption.label}
+              selectedLabel={selectedStoreOption?.label ?? ""}
               onChange={setSelectedStoreOption}
               options={STORE_OPTIONS}
             />
