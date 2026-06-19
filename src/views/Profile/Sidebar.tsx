@@ -21,7 +21,8 @@ interface SidebarItem {
   key: string;
   label: string;
   icon: React.ReactNode;
-  path: string;
+  path?: string;
+  onClick?: () => void;
 }
 
 interface SidebarProps {
@@ -29,7 +30,9 @@ interface SidebarProps {
   activeMenu: string;
   onLogout: () => void;
   genieOpen?: boolean;
+  openGenieOpen?: boolean;
   onGenieToggle?: () => void;
+  onOpenGenieToggle?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -37,7 +40,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   activeMenu,
   onLogout,
   genieOpen = false,
+  openGenieOpen = false,
   onGenieToggle,
+  onOpenGenieToggle,
 }) => {
   const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
@@ -205,28 +210,39 @@ const Sidebar: React.FC<SidebarProps> = ({
       </Box>
 
       {/* Menu Items */}
-      {menuItems.map((item) => (
-        <Box
-          key={item.key}
-          onClick={() => router.push(item.path)}
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1.5,
-            p: 1.5,
-            cursor: "pointer",
-            fontSize: 14,
-            fontWeight: activeMenu === item.key ? "bold" : "normal",
-            color: activeMenu === item.key ? "#FFFFFF" : "#8E92AD",
-            borderRadius: "10px",
-            justifyContent: "flex-start",
-            "&:hover": { color: "#F3F4F6" }, // only color changes
+      {menuItems.map((item) => {
+        const isGenieItem = item.key === "Open Genie";
+        const isActive = isGenieItem ? openGenieOpen : activeMenu === item.key;
+        return (
+          <Box
+            key={item.key}
+            onClick={() => {
+            if (item.key === "Open Genie") { onOpenGenieToggle?.(); return; }
+            item.onClick ? item.onClick() : item.path && router.push(item.path);
           }}
-        >
-          {item.icon}
-          {item.label}
-        </Box>
-      ))}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1.5,
+              p: 1.5,
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: isActive ? "bold" : "normal",
+              color: isGenieItem
+                ? (openGenieOpen ? "#A78BFA" : "#8E92AD")
+                : (isActive ? "#FFFFFF" : "#8E92AD"),
+              borderRadius: "10px",
+              bgcolor: isGenieItem && openGenieOpen ? "rgba(167,139,250,0.12)" : "transparent",
+              justifyContent: "flex-start",
+              transition: "all 0.2s",
+              "&:hover": { color: isGenieItem ? "#A78BFA" : "#F3F4F6" },
+            }}
+          >
+            {item.icon}
+            {item.label}
+          </Box>
+        );
+      })}
 
       {/* Genie AI Toggle */}
       {(userId === "kav1" ||
