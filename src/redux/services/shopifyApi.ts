@@ -68,6 +68,16 @@ export const shopifyApi = createApi({
         response.data,
       providesTags: (result, error, store) => [{ type: "Product", id: store }],
     }),
+    getProductBySku: builder.query<
+      { variantId: string; sku: string; price: string }[],
+      { store: ShopifyStore; sku: string }
+    >({
+      query: ({ store, sku }) => ({
+        url: `/shopify/product-by-sku?store=${store}&sku=${encodeURIComponent(sku)}`,
+        method: "GET",
+      }),
+      transformResponse: (response: { data: any[] }) => response.data,
+    }),
     createOrder: builder.mutation<
       any,
       {
@@ -274,7 +284,14 @@ export const shopifyApi = createApi({
       }) => ({
         url: `/shopify/draft-order/${draftOrderId}?store=${store}`,
         method: "PUT",
-        body: { email, shippingAddress, customAttributes, tags, lineItems, vendor },
+        body: {
+          email,
+          shippingAddress,
+          customAttributes,
+          tags,
+          lineItems,
+          vendor,
+        },
       }),
       invalidatesTags: (result, error, { draftOrderId }) => [
         { type: "DraftOrder", id: draftOrderId },
@@ -451,7 +468,13 @@ export const shopifyApi = createApi({
         restock?: boolean;
       }
     >({
-      query: ({ orderId, store = "store1", reason = "CUSTOMER", refund = false, restock = true }) => ({
+      query: ({
+        orderId,
+        store = "store1",
+        reason = "CUSTOMER",
+        refund = false,
+        restock = true,
+      }) => ({
         url: `/shopify/order/${orderId}/cancel?store=${store}`,
         method: "POST",
         body: { reason, refund, restock },
@@ -521,14 +544,20 @@ export const shopifyApi = createApi({
       { data: { Code: string; Description: string }[]; total_records: number },
       void
     >({
-      query: () => ({ url: `/shopify_return_reasons?page_size=100`, method: "GET" }),
+      query: () => ({
+        url: `/shopify_return_reasons?page_size=100`,
+        method: "GET",
+      }),
     }),
 
     getShopifyReturnReasonsCode: builder.query<
       { data: { Code: string; Description: string }[]; total_records: number },
       void
     >({
-      query: () => ({ url: `/shopify_return_reasons_code?page_size=100`, method: "GET" }),
+      query: () => ({
+        url: `/shopify_return_reasons_code?page_size=100`,
+        method: "GET",
+      }),
     }),
 
     createProduct: builder.mutation<
@@ -542,7 +571,14 @@ export const shopifyApi = createApi({
         vendor?: string;
       }
     >({
-      query: ({ store = "store1", title, price, sku, product_type, vendor }) => ({
+      query: ({
+        store = "store1",
+        title,
+        price,
+        sku,
+        product_type,
+        vendor,
+      }) => ({
         url: `/shopify/create-product?store=${store}`,
         method: "POST",
         body: { title, price, sku, product_type, vendor },
@@ -587,6 +623,7 @@ export const shopifyApi = createApi({
 
 export const {
   useGetProductsQuery,
+  useLazyGetProductBySkuQuery,
   useCreateOrderMutation,
   useCreateDraftOrderMutation,
   useUpdateOrderMutation,

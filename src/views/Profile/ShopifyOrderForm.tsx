@@ -11,6 +11,7 @@ import {
   useGetOrderLineItemsQuery,
   useGetDraftOrderLineItemsQuery,
   useGetProductsQuery,
+  useLazyGetProductBySkuQuery,
   useGetShopifyOrdersQuery,
   useGetShopifyDraftOrdersQuery,
   useGetShopifyReturnReasonsQuery,
@@ -77,6 +78,17 @@ interface LineItem {
   customProductType?: string;
   customVendor?: string;
   isExistingOrderLine?: boolean;
+  // True while the background Shopify SKU check is in flight.
+  shopifyChecking?: boolean;
+  // Set once the Shopify SKU check has run (skipped entirely on lookup
+  // errors, so the UI stays silent rather than reporting a false negative).
+  shopifyChecked?: boolean;
+  // Set when item_no exactly matches a Shopify product SKU — lets the user
+  // toggle between "custom item at Lot No X" and "Shopify product & price".
+  shopifyVariantId?: string;
+  shopifyPrice?: number | null;
+  originalLotNo?: string | null;
+  originalUnitPrice?: number | null;
 }
 
 interface OrderFormState {
@@ -121,6 +133,7 @@ interface DraftNewCustomItem {
   returnReasonCode: string;
   parts: PartRow[];
   isExistingOrderLine?: boolean;
+  variantId?: string;
 }
 
 interface EditOperation {
@@ -694,19 +707,161 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
   );
 };
 
+// ─── useLotOptionsForItem ─────────────────────────────────────────────────────
+// Single source of truth for "search Databricks lots for a known Item No,
+// with price." Used by both LineItemSearchFields (picking a Lot No during
+// initial Item No selection) and LotNoSearchInput (editing the Lot No on an
+// already-added custom item) so the two never diverge again.
+
+interface LotOption {
+  lot_no: string;
+  price: number | null;
+}
+
+function useLotOptionsForItem(
+  itemNo: string | null | undefined,
+  searchTerm: string,
+  enabled: boolean,
+): { results: LotOption[]; isFetching: boolean; isSearching: boolean } {
+  const isSearching = searchTerm.trim().length >= 2;
+  const sku = itemNo || "";
+
+  // All lots for this item — shown by default, no typing required.
+  const { data: allLotsData, isFetching: isFetchingAll } = useGetTouchupsQuery(
+    { sku, isFromProps: false, page_size: 100 },
+    { skip: !sku || !enabled, refetchOnMountOrArgChange: true },
+  );
+
+  // Filtered search once the user types 2+ characters.
+  const { data: searchLotsData, isFetching: isFetchingSearch } =
+    useGetTouchupsQuery(
+      { sku, lot_no: searchTerm.trim(), isFromProps: false, page_size: 50 },
+      {
+        skip: !sku || !enabled || !isSearching,
+        refetchOnMountOrArgChange: true,
+      },
+    );
+
+  const dedupe = (rows: any[]): LotOption[] =>
+    Array.from(
+      new Map(
+        rows
+          .filter((r: any) => r.lot_no)
+          .map((r: any) => [
+            r.lot_no as string,
+            {
+              lot_no: r.lot_no as string,
+              price: r.unit_price != null ? Number(r.unit_price) : null,
+            },
+          ]),
+      ).values(),
+    );
+
+  return {
+    results: isSearching
+      ? dedupe(searchLotsData?.data ?? [])
+      : dedupe(allLotsData?.data ?? []),
+    isFetching: isSearching ? isFetchingSearch : isFetchingAll,
+    isSearching,
+  };
+}
+
 // ─── LineItemSearchFields ─────────────────────────────────────────────────────
 
 interface LineItemSearchFieldsProps {
+  store?: ShopifyStore;
   onPopulate: (data: {
     item_no: string;
     lot_no: string;
     unit_price: number | null;
+    variantId?: string;
+    shopifyChecked?: boolean;
+    // Present whenever a Shopify SKU match was found, whether or not it was
+    // applied — lets the card show an accurate found/not-found status and
+    // offer the custom ↔ Shopify toggle either way.
+    shopifyVariantId?: string;
+    shopifyPrice?: number | null;
+    originalLotNo?: string;
+    originalUnitPrice?: number | null;
   }) => void;
 }
 
 const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
+  store,
   onPopulate,
 }) => {
+  const [triggerProductBySku] = useLazyGetProductBySkuQuery();
+
+  // Shopify SKU match takes precedence over the Databricks unit price. Result
+  // is cached per item_no so the item-picked-first flow (checked as soon as
+  // the item is selected, below) and the lot-picked-first flow (checked at
+  // final populate time) never issue a duplicate lookup or duplicate toast.
+  const [shopifyMatch, setShopifyMatch] = useState<{
+    price: number | null;
+    variantId: string;
+  } | null>(null);
+  const [shopifyCheckedFor, setShopifyCheckedFor] = useState<string | null>(
+    null,
+  );
+
+  const checkShopifySku = async (item_no: string) => {
+    if (!item_no.trim() || !store) return null;
+    try {
+      const matches = await triggerProductBySku({
+        store,
+        sku: item_no,
+      }).unwrap();
+      const exactMatch = matches?.find(
+        (m) => m.sku?.trim().toLowerCase() === item_no.trim().toLowerCase(),
+      );
+      if (exactMatch) {
+        return {
+          price: exactMatch.price != null ? Number(exactMatch.price) : null,
+          variantId: exactMatch.variantId,
+        };
+      }
+    } catch {
+      // Shopify lookup failed (network/API error) — silently fall back to Databricks pricing.
+    }
+    return null;
+  };
+
+  // A Lot No means this is a lot-tracked / custom part — even when the Item
+  // No matches an existing Shopify product, keep the Databricks price and
+  // treat it as a custom item. Only "Proceed without Lot No" (no lot_no)
+  // uses the Shopify match, associating the line with that Shopify variant.
+  const resolveAndPopulate = async (
+    item_no: string,
+    lot_no: string,
+    unit_price: number | null,
+  ) => {
+    const wasChecked = shopifyCheckedFor === item_no;
+    let match = wasChecked ? shopifyMatch : null;
+    if (!wasChecked) {
+      match = await checkShopifySku(item_no);
+      setShopifyMatch(match);
+      setShopifyCheckedFor(item_no);
+    }
+    // A check was attempted whenever there's an item_no + store — record it
+    // so the submit step trusts this decision instead of silently redoing
+    // (and potentially overriding) the SKU match.
+    const shopifyChecked = !!(item_no.trim() && store);
+    const useShopify = !!match && !lot_no.trim();
+    onPopulate({
+      item_no,
+      lot_no,
+      unit_price: useShopify ? match!.price : unit_price,
+      variantId: useShopify ? match!.variantId : undefined,
+      shopifyChecked,
+      // Always surface the match (found or not), so the card can report an
+      // accurate status and offer the toggle even when the Lot No branch
+      // chose to keep this as a custom item instead of using it.
+      shopifyVariantId: match?.variantId,
+      shopifyPrice: match?.price ?? null,
+      originalLotNo: lot_no,
+      originalUnitPrice: unit_price,
+    });
+  };
   const [itemSearchTerm, setItemSearchTerm] = useState("");
   const [debouncedItemSearch, setDebouncedItemSearch] = useState("");
   const [showItemDropdown, setShowItemDropdown] = useState(false);
@@ -726,6 +881,34 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
 
   const itemRef = useRef<HTMLDivElement>(null);
   const lotRef = useRef<HTMLDivElement>(null);
+
+  // Check Shopify as soon as an Item No is picked (item-picked-first flow),
+  // so the inline "exists on Shopify" card message (rendered below, next to
+  // Lot No) is ready as soon as the Lot No step is shown.
+  useEffect(() => {
+    if (!pendingItemNo) {
+      setShopifyMatch(null);
+      setShopifyCheckedFor(null);
+      return;
+    }
+    if (!store) {
+      // Shopify SKU search is scoped per store — nothing to query yet.
+      toast("Select a Store to check this item against Shopify.", {
+        icon: "ℹ️",
+      });
+      return;
+    }
+    let cancelled = false;
+    checkShopifySku(pendingItemNo).then((match) => {
+      if (cancelled) return;
+      setShopifyMatch(match);
+      setShopifyCheckedFor(pendingItemNo);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingItemNo, store]);
 
   useEffect(() => {
     const t = setTimeout(
@@ -800,33 +983,13 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
     lotSearchTerm.trim() !== debouncedLotSearch;
   const showLotLoader = isLotTyping || isLotSearching;
 
-  // Get available lots for a selected item
-  const { data: lotsForItemData, isFetching: isFetchingLotsForItem } =
-    useGetTouchupsQuery(
-      { sku: pendingItemNo!, isFromProps: false, page_size: 100 },
-      {
-        skip: !pendingItemNo || !!pendingLotNo,
-        refetchOnMountOrArgChange: true,
-      },
-    );
-
-  // Search lots scoped to the selected item
-  const { data: lotSearchForItemData, isFetching: isSearchingLotsForItem } =
-    useGetTouchupsQuery(
-      {
-        sku: pendingItemNo!,
-        lot_no: debouncedLotForItemSearch,
-        isFromProps: false,
-        page_size: 50,
-      },
-      {
-        skip:
-          !pendingItemNo ||
-          debouncedLotForItemSearch.length < 2 ||
-          !!pendingLotNo,
-        refetchOnMountOrArgChange: true,
-      },
-    );
+  // Lots for the selected item (all by default, filtered once 2+ chars are
+  // typed) — shared with LotNoSearchInput so both stay in sync.
+  const lotsForItemOptions = useLotOptionsForItem(
+    pendingItemNo,
+    debouncedLotForItemSearch,
+    !!pendingItemNo && !pendingLotNo,
+  );
 
   // Get available items for a selected lot
   const { data: itemsForLotData, isFetching: isFetchingItemsForLot } =
@@ -850,20 +1013,6 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
 
   const lotSearchResults = dedupeBy<{ lot_no: string }>(
     (lotSearchData?.data ?? [])
-      .filter((r: any) => r.lot_no)
-      .map((r: any) => ({ lot_no: r.lot_no as string })),
-    (r) => r.lot_no,
-  );
-
-  const lotsForItem = dedupeBy<{ lot_no: string }>(
-    (lotsForItemData?.data ?? [])
-      .filter((r: any) => r.lot_no)
-      .map((r: any) => ({ lot_no: r.lot_no as string })),
-    (r) => r.lot_no,
-  );
-
-  const lotsForItemSearchResults = dedupeBy<{ lot_no: string }>(
-    (lotSearchForItemData?.data ?? [])
       .filter((r: any) => r.lot_no)
       .map((r: any) => ({ lot_no: r.lot_no as string })),
     (r) => r.lot_no,
@@ -1004,11 +1153,7 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
                 <div
                   key={r.item_no}
                   onClick={() =>
-                    onPopulate({
-                      item_no: r.item_no,
-                      lot_no: pendingLotNo,
-                      unit_price: r.price,
-                    })
+                    resolveAndPopulate(r.item_no, pendingLotNo!, r.price)
                   }
                   style={rowStyle}
                   onMouseEnter={(e) =>
@@ -1032,13 +1177,7 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
           )}
           <button
             type="button"
-            onClick={() =>
-              onPopulate({
-                item_no: "",
-                lot_no: pendingLotNo,
-                unit_price: null,
-              })
-            }
+            onClick={() => resolveAndPopulate("", pendingLotNo!, null)}
             style={{
               padding: "6px 10px",
               border: "1.5px dashed #d1d5db",
@@ -1210,15 +1349,52 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
         lotForItemSearch.trim().length >= 2 &&
         lotForItemSearch.trim() !== debouncedLotForItemSearch;
       const showLotForItemLoader =
-        isLotForItemTyping || isSearchingLotsForItem || isFetchingLotsForItem;
-      const isSearching = debouncedLotForItemSearch.length >= 2;
-      const displayedLots = isSearching
-        ? lotsForItemSearchResults
-        : lotsForItem;
+        isLotForItemTyping || lotsForItemOptions.isFetching;
+      const isSearching = lotsForItemOptions.isSearching;
+      const displayedLots = lotsForItemOptions.results;
+      const existsOnShopify =
+        shopifyCheckedFor === pendingItemNo && !!shopifyMatch;
 
       return (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-          {label}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            {label}
+            {existsOnShopify && (
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 700,
+                  color: "#15803d",
+                  background: "#f0fdf4",
+                  border: "1px solid #86efac",
+                  borderRadius: "999px",
+                  padding: "1px 7px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ✓ In Shopify
+              </span>
+            )}
+          </div>
+
+          {existsOnShopify && (
+            <div
+              style={{
+                fontSize: "11px",
+                color: "#15803d",
+                lineHeight: 1.3,
+              }}
+            >
+              Proceed without Lot No for Shopify pricing, or select a Lot No to
+              add it as a custom product instead.
+            </div>
+          )}
 
           {/* Lot search input — always visible */}
           <input
@@ -1244,11 +1420,11 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
                 <div
                   key={r.lot_no}
                   onClick={() =>
-                    onPopulate({
-                      item_no: pendingItemNo,
-                      lot_no: r.lot_no,
-                      unit_price: pendingPrice,
-                    })
+                    resolveAndPopulate(
+                      pendingItemNo!,
+                      r.lot_no,
+                      r.price != null ? r.price : pendingPrice,
+                    )
                   }
                   style={rowStyle}
                   onMouseEnter={(e) =>
@@ -1261,6 +1437,11 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
                   }
                 >
                   {r.lot_no}
+                  {r.price != null && (
+                    <span style={{ marginLeft: "8px", color: "#6b7280" }}>
+                      — ${r.price}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -1269,7 +1450,7 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
           {/* No results for search */}
           {isSearching &&
             !showLotForItemLoader &&
-            lotsForItemSearchResults.length === 0 && (
+            displayedLots.length === 0 && (
               <div
                 style={{
                   fontSize: "12px",
@@ -1283,20 +1464,16 @@ const LineItemSearchFields: React.FC<LineItemSearchFieldsProps> = ({
 
           <button
             type="button"
-            onClick={() =>
-              onPopulate({
-                item_no: pendingItemNo,
-                lot_no: "",
-                unit_price: pendingPrice,
-              })
-            }
+            onClick={() => resolveAndPopulate(pendingItemNo!, "", pendingPrice)}
             style={{
               padding: "6px 10px",
-              border: "1.5px dashed #d1d5db",
+              border: existsOnShopify
+                ? "1.5px dashed #86efac"
+                : "1.5px dashed #d1d5db",
               borderRadius: "6px",
               fontSize: "12px",
-              color: "#6b7280",
-              background: "transparent",
+              color: existsOnShopify ? "#15803d" : "#6b7280",
+              background: existsOnShopify ? "#f0fdf4" : "transparent",
               cursor: "pointer",
               textAlign: "left",
             }}
@@ -1467,13 +1644,13 @@ const PartsSubSection: React.FC<PartsSubSectionProps> = ({
 
   const { data: customSkuData, isFetching: isCustomFetching } =
     useGetDistinctTouchupItemsQuery(
-      { parts_item_no: `like:${debouncedSku}`, page_size: 50 },
+      { parts_item_no: `like:${debouncedSku}`, page_size: 100 },
       { skip: !customAddEnabled || debouncedSku.length < 2 },
     );
 
   const { data: touchupPenData, isFetching: isTouchupPenFetching } =
     useGetDistinctTouchupPensQuery(
-      { search: debouncedTouchupPenSearch, page_size: 50 },
+      { search: debouncedTouchupPenSearch, page_size: 100 },
       {
         skip: !touchupPenSearchEnabled || debouncedTouchupPenSearch.length < 2,
       },
@@ -2677,6 +2854,165 @@ const CustomItemFields: React.FC<CustomItemFieldsProps> = ({
   );
 };
 
+// ─── LotNoSearchInput ─────────────────────────────────────────────────────────
+// Standalone Lot No search/edit for an already-known Item No — lets a line
+// item that's been switched to "custom item" pick (or change) a Lot No
+// without having to clear and redo the whole Item No search.
+
+const LotNoSearchInput: React.FC<{
+  itemNo: string;
+  value?: string | null;
+  onChange: (lotNo: string, price: number | null) => void;
+}> = ({ itemNo, value, onChange }) => {
+  const [term, setTerm] = useState(value || "");
+  const [debouncedTerm, setDebouncedTerm] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setTerm(value || "");
+  }, [value]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTerm(term.trim()), 400);
+    return () => clearTimeout(t);
+  }, [term]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Same data source as the initial Item/Lot search card — kept in one place
+  // so the two Lot No pickers in this file can never show different data.
+  const { results, isFetching, isSearching } = useLotOptionsForItem(
+    itemNo,
+    debouncedTerm,
+    open,
+  );
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <input
+        type="text"
+        value={term}
+        onFocus={() => setOpen(true)}
+        onChange={(e) => {
+          setTerm(e.target.value);
+          setOpen(true);
+        }}
+        placeholder="Search lot no…"
+        style={{
+          width: "100%",
+          padding: "8px 12px",
+          border: "1.5px solid #e5e7eb",
+          borderRadius: "8px",
+          fontSize: "13px",
+          boxSizing: "border-box",
+        }}
+      />
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 999,
+            top: "calc(100% + 4px)",
+            left: 0,
+            right: 0,
+            background: "#fff",
+            border: "1.5px solid #e5e7eb",
+            borderRadius: "8px",
+            boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+            maxHeight: "160px",
+            overflowY: "auto",
+          }}
+        >
+          {isFetching ? (
+            <div
+              style={{
+                padding: "8px 12px",
+                fontSize: "12px",
+                color: "#9ca3af",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+              }}
+            >
+              <CircularProgress size={12} />{" "}
+              {isSearching ? "Searching…" : "Loading…"}
+            </div>
+          ) : results.length === 0 ? (
+            <div
+              style={{
+                padding: "8px 12px",
+                fontSize: "12px",
+                color: "#9ca3af",
+              }}
+            >
+              No lots found
+            </div>
+          ) : (
+            results.map((lot) => (
+              <div
+                key={lot.lot_no}
+                onClick={() => {
+                  onChange(lot.lot_no, lot.price);
+                  setTerm(lot.lot_no);
+                  setOpen(false);
+                }}
+                style={{
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  color: "#111827",
+                  borderBottom: "1px solid #f3f4f6",
+                }}
+                onMouseEnter={(e) =>
+                  ((e.currentTarget as HTMLDivElement).style.background =
+                    "#f5f3ff")
+                }
+                onMouseLeave={(e) =>
+                  ((e.currentTarget as HTMLDivElement).style.background =
+                    "transparent")
+                }
+              >
+                {lot.lot_no}
+                {lot.price != null && (
+                  <span style={{ marginLeft: "8px", color: "#6b7280" }}>
+                    — ${lot.price}
+                  </span>
+                )}
+              </div>
+            ))
+          )}
+          {term && (
+            <div
+              onClick={() => {
+                onChange("", null);
+                setTerm("");
+                setOpen(false);
+              }}
+              style={{
+                padding: "6px 10px",
+                cursor: "pointer",
+                fontSize: "11px",
+                color: "#6b7280",
+                borderTop: "1px solid #f3f4f6",
+              }}
+            >
+              Clear Lot No
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── DraftCustomItemRow ───────────────────────────────────────────────────────
 
 interface DraftCustomItemRowProps {
@@ -2686,6 +3022,7 @@ interface DraftCustomItemRowProps {
   reasonCodeOptions: { value: string; label: string }[];
   lineReasonCodeOptions: { value: string; label: string }[];
   washWholeUnit?: boolean;
+  store?: ShopifyStore;
 }
 
 const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
@@ -2695,6 +3032,7 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
   reasonCodeOptions,
   lineReasonCodeOptions,
   washWholeUnit = false,
+  store,
 }) => {
   const lineAmount =
     item.price !== "" && !isNaN(parseFloat(item.price))
@@ -2787,7 +3125,14 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
                 {!item.isExistingOrderLine && (
                   <button
                     type="button"
-                    onClick={() => onUpdate({ title: "", lot_no: "", price: "" })}
+                    onClick={() =>
+                      onUpdate({
+                        title: "",
+                        lot_no: "",
+                        price: "",
+                        variantId: undefined,
+                      })
+                    }
                     style={{
                       background: "none",
                       border: "none",
@@ -2830,12 +3175,14 @@ const DraftCustomItemRow: React.FC<DraftCustomItemRowProps> = ({
           </>
         ) : (
           <LineItemSearchFields
-            onPopulate={({ item_no, lot_no, unit_price }) => {
+            store={store}
+            onPopulate={({ item_no, lot_no, unit_price, variantId }) => {
               onUpdate({
                 title: item_no,
                 lot_no,
                 price: unit_price != null ? String(unit_price) : "",
                 quantity: 1,
+                variantId,
               });
             }}
           />
@@ -3139,6 +3486,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     isLoading: productsLoading,
     refetch: refetchProducts,
   } = useGetProductsQuery(selectedStore!, { skip: !selectedStore });
+  const [triggerProductBySku] = useLazyGetProductBySkuQuery();
 
   const variantOptions = useMemo<VariantOption[]>(() => {
     if (!products) return [];
@@ -3150,6 +3498,21 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
         variant,
       })),
     );
+  }, [products]);
+
+  // SKU (item_no) → Shopify variant id, for matching already-selected inventory
+  // items to an existing Shopify variant when building the draft order payload.
+  // Case-insensitive; does not affect inventory search or item selection.
+  const skuToVariantId = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!products) return map;
+    for (const product of products) {
+      for (const { node: variant } of product.variants.edges) {
+        const sku = variant.sku?.trim().toLowerCase();
+        if (sku) map.set(sku, variant.id);
+      }
+    }
+    return map;
   }, [products]);
 
   const getProductVariants = (productId: string | null): ProductVariant[] => {
@@ -3192,11 +3555,14 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     return trimmed;
   };
 
-  const { data: editShopifyOrdersData, isFetching: isEditOrderSearching, isError: isEditOrdersError } =
-    useGetShopifyOrdersQuery(
-      { store: selectedStore!, limit: 50, query: editSearchFilter },
-      { skip: !selectedStore || mode !== "editOrder" },
-    );
+  const {
+    data: editShopifyOrdersData,
+    isFetching: isEditOrderSearching,
+    isError: isEditOrdersError,
+  } = useGetShopifyOrdersQuery(
+    { store: selectedStore!, limit: 50, query: editSearchFilter },
+    { skip: !selectedStore || mode !== "editOrder" },
+  );
   const editOrderSuggestions = useMemo(
     () => (isEditOrdersError ? [] : editShopifyOrdersData?.data || []),
     [editShopifyOrdersData, isEditOrdersError],
@@ -3244,11 +3610,14 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     null,
   );
 
-  const { data: editDraftOrdersData, isFetching: isDraftOrderSearching, isError: isDraftOrdersError } =
-    useGetShopifyDraftOrdersQuery(
-      { store: selectedStore!, limit: 50, query: draftSearchFilter },
-      { skip: !selectedStore || mode !== "editDraft" },
-    );
+  const {
+    data: editDraftOrdersData,
+    isFetching: isDraftOrderSearching,
+    isError: isDraftOrdersError,
+  } = useGetShopifyDraftOrdersQuery(
+    { store: selectedStore!, limit: 50, query: draftSearchFilter },
+    { skip: !selectedStore || mode !== "editDraft" },
+  );
   const draftOrderSuggestions = useMemo(
     () => (isDraftOrdersError ? [] : editDraftOrdersData?.data || []),
     [editDraftOrdersData, isDraftOrdersError],
@@ -3325,7 +3694,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     refetch: refetchLineItems,
   } = useGetOrderLineItemsQuery(
     { orderId: loadLineItemsOrderId, store: selectedStore! },
-    { skip: !loadLineItemsOrderId || !selectedStore, refetchOnMountOrArgChange: true },
+    {
+      skip: !loadLineItemsOrderId || !selectedStore,
+      refetchOnMountOrArgChange: true,
+    },
   );
 
   // Force refetch when the same order is re-selected (cache bypass)
@@ -3393,7 +3765,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     refetch: refetchDraftLineItems,
   } = useGetDraftOrderLineItemsQuery(
     { draftOrderId: loadDraftLineItemsId, store: selectedStore! },
-    { skip: !loadDraftLineItemsId || !selectedStore, refetchOnMountOrArgChange: true },
+    {
+      skip: !loadDraftLineItemsId || !selectedStore,
+      refetchOnMountOrArgChange: true,
+    },
   );
 
   // Force refetch when the same draft order is re-selected (cache bypass)
@@ -3619,31 +3994,20 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   };
 
   const handleAddLineItemFromDropdown = (row: any) => {
-    const description: string = (row.description || "").trim().toLowerCase();
-    const matchedProduct =
-      products?.find((p) => p.title.trim().toLowerCase() === description) ??
-      null;
-
-    let autoVariantId = "";
-    if (matchedProduct) {
-      const variants = matchedProduct.variants.edges;
-      if (
-        variants.length === 1 ||
-        variants[0]?.node.title === "Default Title"
-      ) {
-        autoVariantId = variants[0]?.node.id ?? "";
-      }
-    }
-
-    const isUnmatched = !matchedProduct && !!(row.description || row.item_no);
+    // Matching is SKU-only now — no more matching by product title/description.
+    // variantId starts empty; the background Shopify SKU check below (by
+    // item_no) is the only thing that can attach a real Shopify variant.
+    const isUnmatched = !!(row.description || row.item_no);
+    const willCheckShopify = !!(row.item_no && selectedStore);
     const newItem: LineItem = {
-      variantId: autoVariantId,
+      variantId: "",
       quantity: row.quantity != null ? Number(row.quantity) : 1,
       item_no: row.item_no || undefined,
       lot_no: row.lot_no ?? undefined,
       unit_price: row.unit_price ?? null,
       description: row.description || null,
       isExistingOrderLine: true,
+      shopifyChecking: willCheckShopify,
       // pre-populate custom fields for use in the confirm modal (not auto-ticked)
       ...(isUnmatched && {
         customTitle: row.description || row.item_no || "",
@@ -3654,11 +4018,81 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       }),
     };
 
-    setLineItemProductIds((prev) => [...prev, matchedProduct?.id ?? null]);
+    // Add the line item immediately — never block on the network. The
+    // Shopify SKU check (below) runs in the background and only patches
+    // this same item in place once it resolves.
+    setLineItemProductIds((prev) => [...prev, null]);
     setForm((prev) => ({
       ...prev,
       lineItems: [...prev.lineItems, newItem],
     }));
+
+    // Shopify SKU precedence, checked in the background: an exact SKU match
+    // takes priority over the order's saved item_no/lot_no data. No Lot No
+    // on the row → switch straight to the Shopify product & price. Lot No
+    // present → leave it as the custom (lot-tracked) item added above, but
+    // flag the match so the user can toggle it to the Shopify product.
+    if (willCheckShopify) {
+      const itemNo = row.item_no;
+      const store = selectedStore!;
+      triggerProductBySku({ store, sku: itemNo })
+        .unwrap()
+        .then((skuMatches) => {
+          const exactMatch = skuMatches?.find(
+            (m) =>
+              m.sku?.trim().toLowerCase() ===
+              String(itemNo).trim().toLowerCase(),
+          );
+          const hasLotNo = !!(row.lot_no && String(row.lot_no).trim());
+
+          setForm((prev) => {
+            const idx = prev.lineItems.findIndex((li) => li === newItem);
+            if (idx === -1) return prev;
+            const items = [...prev.lineItems];
+
+            if (!exactMatch) {
+              // Checked and confirmed no Shopify match — mark it so the
+              // card can say so, instead of staying silent either way.
+              items[idx] = {
+                ...items[idx],
+                shopifyChecking: false,
+                shopifyChecked: true,
+              };
+              return { ...prev, lineItems: items };
+            }
+
+            const shopifyVariantId = exactMatch.variantId;
+            const shopifyPrice =
+              exactMatch.price != null ? Number(exactMatch.price) : null;
+            items[idx] = {
+              ...items[idx],
+              shopifyChecking: false,
+              shopifyChecked: true,
+              shopifyVariantId,
+              shopifyPrice,
+              originalLotNo: row.lot_no ?? null,
+              originalUnitPrice: row.unit_price ?? null,
+              ...(!hasLotNo && {
+                variantId: shopifyVariantId,
+                lot_no: null,
+                unit_price: shopifyPrice,
+              }),
+            };
+            return { ...prev, lineItems: items };
+          });
+        })
+        .catch(() => {
+          // Shopify lookup failed (network/API error) — silently fall back;
+          // just clear the "checking" state so the card doesn't hang.
+          setForm((prev) => {
+            const idx = prev.lineItems.findIndex((li) => li === newItem);
+            if (idx === -1) return prev;
+            const items = [...prev.lineItems];
+            items[idx] = { ...items[idx], shopifyChecking: false };
+            return { ...prev, lineItems: items };
+          });
+        });
+    }
   };
 
   // ── Edit draft: import-from-order handlers ───────────────────────────────
@@ -3760,11 +4194,39 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     setForm({ ...form, lineItems: newLineItems });
   };
 
+  // Flip a line item that matched a Shopify SKU between "custom item at its
+  // original Lot No" and "Shopify product & price" (no Lot No).
+  const toggleLineItemShopifySource = (index: number) => {
+    setForm((prev) => {
+      const items = [...prev.lineItems];
+      const it = items[index];
+      if (!it.shopifyVariantId) return prev;
+      const usingShopify = it.variantId === it.shopifyVariantId && !it.lot_no;
+      items[index] = usingShopify
+        ? {
+            ...it,
+            variantId: "",
+            lot_no: it.originalLotNo ?? null,
+            unit_price: it.originalUnitPrice ?? null,
+          }
+        : {
+            ...it,
+            variantId: it.shopifyVariantId,
+            lot_no: null,
+            unit_price: it.shopifyPrice ?? null,
+          };
+      return { ...prev, lineItems: items };
+    });
+  };
+
   const addLineItem = () => {
     setLineItemProductIds((prev) => [...prev, null]);
     setForm((prev) => ({
       ...prev,
-      lineItems: [...prev.lineItems, { variantId: "", quantity: 1, isExistingOrderLine: false }],
+      lineItems: [
+        ...prev.lineItems,
+        { variantId: "", quantity: 1, isExistingOrderLine: false },
+      ],
     }));
   };
 
@@ -3791,10 +4253,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     return props;
   };
 
-  const getStoreCode = (storeName: string) => storeName.split("-")[0].trim().replace(/\s+/g, "");
+  const getStoreCode = (storeName: string) =>
+    storeName.split("-")[0].trim().replace(/\s+/g, "");
   const vendor = getStoreCode(selectedStoreOption?.label ?? "");
 
-  const buildLineItemsPayload = (items: LineItem[]) => {
+  const buildLineItemsPayload = async (items: LineItem[]) => {
     const result: any[] = [];
     const storeLabel = selectedStoreOption?.label ?? "";
     const forcePartsZeroPrice =
@@ -3841,11 +4304,45 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             name: "return_reason_code",
             value: item.reason_code,
           });
+        // Trust a Shopify decision already made for this item (via the
+        // search card's "Proceed without Lot No" vs "select a Lot No", the
+        // Import-from-Order check, or the "use custom item" toggle) — never
+        // silently re-attach or drop a variant the user explicitly chose.
+        let matchedVariantId: string | undefined = item.variantId || undefined;
+        if (!matchedVariantId && !item.shopifyChecked) {
+          // No decision recorded yet for this item — fall back to the
+          // original auto-match so older/edge-case entry points still work.
+          // 1) Fast path — check the preloaded product catalog (first 250 products).
+          matchedVariantId = item.item_no
+            ? skuToVariantId.get(item.item_no.trim().toLowerCase())
+            : undefined;
+          // 2) Fallback — the catalog can exceed 250 products, so do a targeted
+          // Shopify SKU lookup that isn't limited by the preloaded page size.
+          if (!matchedVariantId && item.item_no && selectedStore) {
+            try {
+              const skuMatches = await triggerProductBySku({
+                store: selectedStore,
+                sku: item.item_no,
+              }).unwrap();
+              // Shopify's sku: search can return partial/fuzzy matches — only
+              // accept an exact (case-insensitive) SKU match, never the closest one.
+              const exactMatch = skuMatches?.find(
+                (m) =>
+                  m.sku?.trim().toLowerCase() ===
+                  item.item_no!.trim().toLowerCase(),
+              );
+              matchedVariantId = exactMatch?.variantId;
+            } catch {
+              // Lookup failed — fall through to the existing custom-item behavior.
+            }
+          }
+        }
         result.push({
           quantity: item.quantity,
           title: item.description || item.item_no || "Custom Item",
           price: item.unit_price != null ? String(item.unit_price) : "0.00",
           sku: item.item_no || undefined,
+          ...(matchedVariantId && { variantId: matchedVariantId }),
           ...(lineProps.length > 0 && { properties: lineProps }),
         });
       }
@@ -3887,15 +4384,14 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       //   }).unwrap();
       //   toast.success("Order created successfully!");
       // } else {
-      const draftTags = washWholeUnit
-        ? ["cxi-washwholeunit"]
-        : [];
+      const draftTags = washWholeUnit ? ["cxi-washwholeunit"] : [];
+      const lineItems = await buildLineItemsPayload(form.lineItems);
       await createDraftOrder({
         store: selectedStore,
         email: form.email,
         tags: draftTags,
         washWholeUnit,
-        lineItems: buildLineItemsPayload(form.lineItems),
+        lineItems,
         shippingAddress: form.shippingAddress,
         vendor,
       }).unwrap();
@@ -4034,6 +4530,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
     // Expand custom items with parts into individual part line items (same as create flow)
     const expandedNewCustom: Array<{
+      variantId?: string;
       title?: string;
       quantity: number;
       originalUnitPrice?: string;
@@ -4062,6 +4559,13 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             ...(part.touchup_color ? { touchupColor: part.touchup_color } : {}),
           });
         }
+      } else if (li.variantId) {
+        // Item No exactly matched an existing Shopify variant — associate the
+        // line with that variant instead of sending it as a custom item.
+        expandedNewCustom.push({
+          variantId: li.variantId,
+          quantity: li.quantity,
+        });
       } else {
         expandedNewCustom.push({
           title: li.title.trim(),
@@ -4449,6 +4953,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               { key: "create", label: "Create Order" },
               { key: "editOrder", label: "Edit Order" },
               { key: "editDraft", label: "Edit Draft" },
+              // Hidden for now
               // { key: "createProduct", label: "Create Product" },
             ] as { key: FormMode; label: string }[]
           ).map(({ key, label }) => (
@@ -4667,11 +5172,19 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 options={reasonCodeOptions}
                 placeholder="— select reason code —"
               />
-              {selectedReasonCode && `cxi-rc_${selectedReasonCode}`.length > 40 && (
-                <span style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626" }}>
-                  Tag limit exceeded: "cxi-rc_{selectedReasonCode}" is {`cxi-rc_${selectedReasonCode}`.length} characters (max 40).
-                </span>
-              )}
+              {selectedReasonCode &&
+                `cxi-rc_${selectedReasonCode}`.length > 40 && (
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      marginTop: "3px",
+                      color: "#dc2626",
+                    }}
+                  >
+                    Tag limit exceeded: "cxi-rc_{selectedReasonCode}" is{" "}
+                    {`cxi-rc_${selectedReasonCode}`.length} characters (max 40).
+                  </span>
+                )}
             </div>
             <div style={fieldWrap}>
               <label style={labelStyle}>
@@ -4688,8 +5201,16 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                 onChange={(e) => setSelectedExternalDocInfo(e.target.value)}
               />
               {`zendesk_${selectedExternalDocInfo}`.length > 40 && (
-                <span style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626" }}>
-                  Tag limit exceeded: "zendesk_{selectedExternalDocInfo}" is {`zendesk_${selectedExternalDocInfo}`.length} characters (max 40).
+                <span
+                  style={{
+                    fontSize: "11px",
+                    marginTop: "3px",
+                    color: "#dc2626",
+                  }}
+                >
+                  Tag limit exceeded: "zendesk_{selectedExternalDocInfo}" is{" "}
+                  {`zendesk_${selectedExternalDocInfo}`.length} characters (max
+                  40).
                 </span>
               )}
             </div>
@@ -5055,6 +5576,11 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                                     item_no: undefined,
                                     lot_no: null,
                                     unit_price: null,
+                                    // Clear any Shopify decision tied to the
+                                    // item being removed — it must not carry
+                                    // over to whatever gets selected next.
+                                    variantId: "",
+                                    shopifyChecked: undefined,
                                   };
                                   return { ...prev, lineItems: updated };
                                 })
@@ -5091,23 +5617,64 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                         >
                           Lot No
                         </span>
-                        <div
-                          style={{
-                            padding: "8px 12px",
-                            border: "1.5px solid #e5e7eb",
-                            borderRadius: "8px",
-                            fontSize: "13px",
-                            color: item.lot_no ? "#111827" : "#9ca3af",
-                            background: "#f9fafb",
-                          }}
-                        >
-                          {item.lot_no || "—"}
-                        </div>
+                        {!item.variantId && item.item_no ? (
+                          // Custom item — Lot No is editable/searchable for
+                          // this Item No (Shopify products have no Lot No).
+                          <LotNoSearchInput
+                            itemNo={item.item_no}
+                            value={item.lot_no}
+                            onChange={(lot, price) =>
+                              setForm((prev) => {
+                                const newLineItems = [...prev.lineItems];
+                                newLineItems[index] = {
+                                  ...newLineItems[index],
+                                  lot_no: lot || null,
+                                  // Carry the Databricks price for this
+                                  // specific item/lot, same as picking it
+                                  // from the initial search card would.
+                                  ...(price != null && { unit_price: price }),
+                                  // Keep in sync with the latest manual pick
+                                  // so a later Shopify → custom toggle
+                                  // restores THIS lot, not a stale one.
+                                  originalLotNo: lot || null,
+                                  ...(price != null && {
+                                    originalUnitPrice: price,
+                                  }),
+                                };
+                                return { ...prev, lineItems: newLineItems };
+                              })
+                            }
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              padding: "8px 12px",
+                              border: "1.5px solid #e5e7eb",
+                              borderRadius: "8px",
+                              fontSize: "13px",
+                              color: item.lot_no ? "#111827" : "#9ca3af",
+                              background: "#f9fafb",
+                            }}
+                          >
+                            {item.lot_no || "—"}
+                          </div>
+                        )}
                       </div>
                     </>
                   ) : (
                     <LineItemSearchFields
-                      onPopulate={({ item_no, lot_no, unit_price }) => {
+                      store={selectedStore}
+                      onPopulate={({
+                        item_no,
+                        lot_no,
+                        unit_price,
+                        variantId,
+                        shopifyChecked,
+                        shopifyVariantId,
+                        shopifyPrice,
+                        originalLotNo,
+                        originalUnitPrice,
+                      }) => {
                         setForm((prev) => {
                           const newLineItems = [...prev.lineItems];
                           newLineItems[index] = {
@@ -5116,6 +5683,20 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                             lot_no,
                             unit_price: unit_price ?? null,
                             quantity: 1,
+                            // Explicit, not conditional — reselecting with a
+                            // Lot No (forcing custom) must clear a stale
+                            // variantId from a prior no-lot Shopify match.
+                            variantId: variantId ?? "",
+                            // Already resolved by the search card above (its
+                            // "Proceed without Lot No" vs "select a Lot No"
+                            // choice) — submit must not silently redo/undo it.
+                            shopifyChecked,
+                            // Drives the found/not-found status + toggle on
+                            // this card, matching the Import-from-Order flow.
+                            shopifyVariantId,
+                            shopifyPrice: shopifyPrice ?? null,
+                            originalLotNo: originalLotNo ?? null,
+                            originalUnitPrice: originalUnitPrice ?? null,
                           };
                           return { ...prev, lineItems: newLineItems };
                         });
@@ -5143,7 +5724,17 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                       min={0}
                       step="0.01"
                       value={item.unit_price ?? ""}
-                      disabled={washWholeUnit}
+                      disabled={
+                        washWholeUnit ||
+                        (!!item.variantId &&
+                          item.variantId === item.shopifyVariantId)
+                      }
+                      title={
+                        !!item.variantId &&
+                        item.variantId === item.shopifyVariantId
+                          ? "Price comes from Shopify and can't be edited here — toggle to a custom item to set a manual price."
+                          : undefined
+                      }
                       onChange={(e) => {
                         const v = parseFloat(e.target.value);
                         handleLineItemChange(
@@ -5157,7 +5748,9 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                         ...inputStyle,
                         fontSize: "13px",
                         padding: "8px 12px",
-                        ...(washWholeUnit
+                        ...(washWholeUnit ||
+                        (!!item.variantId &&
+                          item.variantId === item.shopifyVariantId)
                           ? {
                               background: "#f3f4f6",
                               color: "#9ca3af",
@@ -5253,6 +5846,83 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     />
                   </div>
                 </div>
+
+                {item.shopifyChecking && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "6px 10px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      background: "#f9fafb",
+                      fontSize: "11px",
+                      color: "#6b7280",
+                    }}
+                  >
+                    <CircularProgress size={11} /> Checking Shopify…
+                  </div>
+                )}
+
+                {item.shopifyChecked && !item.shopifyVariantId && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      padding: "6px 10px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      background: "#f9fafb",
+                      fontSize: "11px",
+                      color: "#6b7280",
+                    }}
+                  >
+                    Not found in Shopify — added using its saved price.
+                  </div>
+                )}
+
+                {item.shopifyVariantId && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "10px",
+                      padding: "6px 10px",
+                      border: "1px solid #86efac",
+                      borderRadius: "8px",
+                      background: "#f0fdf4",
+                    }}
+                  >
+                    <span style={{ fontSize: "11px", color: "#15803d" }}>
+                      <strong>✓ In Shopify.</strong>{" "}
+                      {item.variantId === item.shopifyVariantId && !item.lot_no
+                        ? "Using the Shopify product & price."
+                        : `Added as a custom item (Lot: ${item.lot_no || "—"}).`}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleLineItemShopifySource(index)}
+                      style={{
+                        flexShrink: 0,
+                        padding: "4px 10px",
+                        border: "1px solid #86efac",
+                        borderRadius: "6px",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "#15803d",
+                        background: "#fff",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {item.variantId === item.shopifyVariantId && !item.lot_no
+                        ? "Use custom item instead"
+                        : "Use Shopify product instead"}
+                    </button>
+                  </div>
+                )}
 
                 {/* Return Reason Code — only on line item when it has no parts */}
                 {(!item.parts || item.parts.length === 0) && (
@@ -5864,11 +6534,24 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   value={editTags}
                   onChange={(e) => setEditTags(e.target.value)}
                 />
-                {editTags.split(",").map((t) => t.trim()).filter((t) => t.length > 40).map((t) => (
-                  <span key={t} style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626", display: "block" }}>
-                    Tag limit exceeded: "{t}" is {t.length} characters (max 40).
-                  </span>
-                ))}
+                {editTags
+                  .split(",")
+                  .map((t) => t.trim())
+                  .filter((t) => t.length > 40)
+                  .map((t) => (
+                    <span
+                      key={t}
+                      style={{
+                        fontSize: "11px",
+                        marginTop: "3px",
+                        color: "#dc2626",
+                        display: "block",
+                      }}
+                    >
+                      Tag limit exceeded: "{t}" is {t.length} characters (max
+                      40).
+                    </span>
+                  ))}
               </div>
 
               {/* Custom Attributes */}
@@ -7170,11 +7853,24 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                   value={editTags}
                   onChange={(e) => setEditTags(e.target.value)}
                 />
-                {editTags.split(",").map((t) => t.trim()).filter((t) => t.length > 40).map((t) => (
-                  <span key={t} style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626", display: "block" }}>
-                    Tag limit exceeded: "{t}" is {t.length} characters (max 40).
-                  </span>
-                ))}
+                {editTags
+                  .split(",")
+                  .map((t) => t.trim())
+                  .filter((t) => t.length > 40)
+                  .map((t) => (
+                    <span
+                      key={t}
+                      style={{
+                        fontSize: "11px",
+                        marginTop: "3px",
+                        color: "#dc2626",
+                        display: "block",
+                      }}
+                    >
+                      Tag limit exceeded: "{t}" is {t.length} characters (max
+                      40).
+                    </span>
+                  ))}
               </div>
 
               {/* Reason Code */}
@@ -7206,11 +7902,20 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                       options={reasonCodeOptions}
                       placeholder="— select reason code —"
                     />
-                    {draftEditReasonCode && `cxi-rc_${draftEditReasonCode}`.length > 40 && (
-                      <span style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626" }}>
-                        Tag limit exceeded: "cxi-rc_{draftEditReasonCode}" is {`cxi-rc_${draftEditReasonCode}`.length} characters (max 40).
-                      </span>
-                    )}
+                    {draftEditReasonCode &&
+                      `cxi-rc_${draftEditReasonCode}`.length > 40 && (
+                        <span
+                          style={{
+                            fontSize: "11px",
+                            marginTop: "3px",
+                            color: "#dc2626",
+                          }}
+                        >
+                          Tag limit exceeded: "cxi-rc_{draftEditReasonCode}" is{" "}
+                          {`cxi-rc_${draftEditReasonCode}`.length} characters
+                          (max 40).
+                        </span>
+                      )}
                   </>
                 )}
               </div>
@@ -7248,8 +7953,16 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                       }
                     />
                     {`zendesk_${draftEditExternalDocInfo}`.length > 40 && (
-                      <span style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626" }}>
-                        Tag limit exceeded: "zendesk_{draftEditExternalDocInfo}" is {`zendesk_${draftEditExternalDocInfo}`.length} characters (max 40).
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          marginTop: "3px",
+                          color: "#dc2626",
+                        }}
+                      >
+                        Tag limit exceeded: "zendesk_{draftEditExternalDocInfo}"
+                        is {`zendesk_${draftEditExternalDocInfo}`.length}{" "}
+                        characters (max 40).
                       </span>
                     )}
                   </>
@@ -8171,6 +8884,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
                     reasonCodeOptions={reasonCodeOptions}
                     lineReasonCodeOptions={lineReasonCodeOptions}
                     washWholeUnit={draftWashWholeUnit}
+                    store={selectedStore}
                   />
                 ))}
               </div>
