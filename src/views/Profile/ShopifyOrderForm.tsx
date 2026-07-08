@@ -103,8 +103,13 @@ interface CustomAttribute {
   value: string;
 }
 
-type FormMode = "create" | "editOrder" | "editDraft" | "createProduct";
-type EditSubTab = "details" | "lineItems" | "cancel";
+type FormMode =
+  | "create"
+  | "editOrder"
+  | "cancelOrder"
+  | "editDraft"
+  | "createProduct";
+type EditSubTab = "details" | "lineItems";
 type DraftSubTab = "details" | "lineItems";
 type OpType = "addVariant" | "setQuantity" | "addDiscount" | "addCustomItem";
 
@@ -3561,7 +3566,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     isError: isEditOrdersError,
   } = useGetShopifyOrdersQuery(
     { store: selectedStore!, limit: 50, query: editSearchFilter },
-    { skip: !selectedStore || mode !== "editOrder" },
+    {
+      skip:
+        !selectedStore || (mode !== "editOrder" && mode !== "cancelOrder"),
+    },
   );
   const editOrderSuggestions = useMemo(
     () => (isEditOrdersError ? [] : editShopifyOrdersData?.data || []),
@@ -3846,8 +3854,17 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
   // ── Edit eligibility check ────────────────────────────────────────────────
   const { data: editEligibility, isFetching: isCheckingEligibility } =
     useGetOrderEditEligibilityQuery(
-      { orderId: editOrderId, store: selectedStore! },
-      { skip: !selectedStore || !editOrderId.trim() || mode !== "editOrder" },
+      {
+        orderId: editOrderId,
+        store: selectedStore!,
+        action: mode === "cancelOrder" ? "cancelled" : "edited",
+      },
+      {
+        skip:
+          !selectedStore ||
+          !editOrderId.trim() ||
+          (mode !== "editOrder" && mode !== "cancelOrder"),
+      },
     );
   const [editSelectedOrder, setEditSelectedOrder] = useState<any>(null);
   const [removedLineItemIds, setRemovedLineItemIds] = useState<Set<string>>(
@@ -3875,6 +3892,8 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
 
   // Reset edit state when switching modes
   useEffect(() => {
+    setEditOrderId("");
+    setLoadLineItemsOrderId("");
     setEditEmail("");
     setEditTags("");
     setEditAddr({ ...defaultAddress });
@@ -4832,6 +4851,233 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     </div>
   );
 
+  // ── Shared Order ID + Store search / eligibility banner (Edit & Cancel) ────
+  const renderEditOrderSearchHeader = () => (
+    <>
+      {/* Order ID + Store */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "20px",
+          marginBottom: "24px",
+        }}
+      >
+        <div style={fieldWrap}>
+          <label style={labelStyle}>Order ID *</label>
+          <Autocomplete
+            options={editOrderSuggestions}
+            loading={isEditOrderSearching}
+            getOptionLabel={(o: any) => o.name || o.id?.split("/").pop() || ""}
+            isOptionEqualToValue={(o: any, v: any) => o.id === v.id}
+            filterOptions={(x) => x}
+            value={editSelectedOrder}
+            inputValue={editSearchInput}
+            onInputChange={(_, val, reason) => {
+              if (reason === "input") {
+                setEditSearchInput(val);
+                if (editSearchDebounceRef.current)
+                  clearTimeout(editSearchDebounceRef.current);
+                editSearchDebounceRef.current = setTimeout(() => {
+                  setEditSearchFilter(buildShopifyQuery(val));
+                }, 400);
+              }
+            }}
+            onChange={(_, selected) => {
+              setEditSelectedOrder(selected);
+              if (selected) {
+                handleSelectEditOrder(selected, false);
+              } else {
+                setEditOrderId("");
+                setLoadLineItemsOrderId("");
+                setEditSearchInput("");
+                setEditSearchFilter(undefined);
+                setEditEmail("");
+                setEditTags("");
+                setEditAddr({ ...defaultAddress });
+                setRemovedLineItemIds(new Set());
+                setOperations([newOperation()]);
+                resetEditOrder();
+              }
+            }}
+            renderOption={(props, option: any) => {
+              const { key, ...liProps } = props as any;
+              const numericId = option.id?.split("/").pop() || "";
+              return (
+                <li key={key} {...liProps} style={{ padding: "6px 12px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      flexWrap: "nowrap",
+                      overflow: "hidden",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: "#4f46e5",
+                        fontSize: "12px",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {option.name}
+                    </span>
+                    <span
+                      style={{
+                        color: "#9ca3af",
+                        fontSize: "11px",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      #{numericId}
+                    </span>
+                    {option.email && (
+                      <span
+                        style={{
+                          color: "#6b7280",
+                          fontSize: "11px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {option.email}
+                      </span>
+                    )}
+                    {option.shippingAddress?.firstName && (
+                      <span
+                        style={{
+                          color: "#9ca3af",
+                          fontSize: "11px",
+                          whiteSpace: "nowrap",
+                          marginLeft: "auto",
+                        }}
+                      >
+                        {option.shippingAddress.firstName}{" "}
+                        {option.shippingAddress.lastName}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search by order # or email…"
+                size="small"
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "8px",
+                    fontSize: "14px",
+                    "& fieldset": {
+                      borderColor: editOrderId ? "#6366f1" : "#e5e7eb",
+                    },
+                  },
+                }}
+                slotProps={{
+                  input: {
+                    ...params.InputProps,
+                    endAdornment: (
+                      <>
+                        {isEditOrderSearching && (
+                          <CircularProgress color="inherit" size={14} />
+                        )}
+                        {params.InputProps.endAdornment}
+                      </>
+                    ),
+                  },
+                }}
+              />
+            )}
+          />
+          <span
+            style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}
+          >
+            Type order # (e.g. 1001) or email to search
+          </span>
+        </div>
+        <div style={fieldWrap}>
+          <label style={labelStyle}>Store *</label>
+          <StoreDropdown
+            selectedLabel={selectedStoreOption?.label ?? ""}
+            onChange={(opt) => setSelectedStoreOption(opt)}
+            options={STORE_OPTIONS}
+          />
+        </div>
+      </div>
+
+      {/* ── Edit eligibility banner ── */}
+      {editOrderId.trim() && (
+        <div style={{ marginBottom: "20px" }}>
+          {isCheckingEligibility ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background: "#f9fafb",
+                border: "1px solid #e5e7eb",
+                fontSize: "13px",
+                color: "#6b7280",
+              }}
+            >
+              <CircularProgress size={13} />
+              {mode === "cancelOrder"
+                ? "Checking cancellation eligibility…"
+                : "Checking edit eligibility…"}
+            </div>
+          ) : editEligibility && !editEligibility.canEdit ? (
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background: "#fef2f2",
+                border: "1px solid #fca5a5",
+                fontSize: "13px",
+                color: "#dc2626",
+                fontWeight: 500,
+              }}
+            >
+              {editEligibility.reason}
+            </div>
+          ) : editEligibility?.canEdit &&
+            editEligibility.remainingMinutes !== null ? (
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: "8px",
+                background:
+                  (editEligibility.remainingMinutes ?? 90) < 10
+                    ? "#fffbeb"
+                    : "#f0fdf4",
+                border: `1px solid ${(editEligibility.remainingMinutes ?? 90) < 10 ? "#fde68a" : "#86efac"}`,
+                fontSize: "13px",
+                color:
+                  (editEligibility.remainingMinutes ?? 90) < 10
+                    ? "#b45309"
+                    : "#15803d",
+                fontWeight: 500,
+              }}
+            >
+              {mode === "cancelOrder"
+                ? (editEligibility.remainingMinutes ?? 90) < 10
+                  ? `Cancellation window closing — ${editEligibility.remainingMinutes} min remaining`
+                  : `Order can be cancelled — ${editEligibility.remainingMinutes} min remaining`
+                : (editEligibility.remainingMinutes ?? 90) < 10
+                  ? `Editing window closing — ${editEligibility.remainingMinutes} min remaining`
+                  : `Order editable — ${editEligibility.remainingMinutes} min remaining`}
+            </div>
+          ) : null}
+        </div>
+      )}
+    </>
+  );
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   const modeConfig: Record<FormMode, { title: string; subtitle: string }> = {
@@ -4842,6 +5088,10 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
     editOrder: {
       title: "Edit Order",
       subtitle: "Update details or edit line items on an existing order",
+    },
+    cancelOrder: {
+      title: "Cancel Order",
+      subtitle: "Cancel an existing order",
     },
     editDraft: {
       title: "Edit Draft Order",
@@ -4952,6 +5202,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             [
               { key: "create", label: "Create Order" },
               { key: "editOrder", label: "Edit Order" },
+              { key: "cancelOrder", label: "Cancel Order" },
               { key: "editDraft", label: "Edit Draft" },
               // Hidden for now
               // { key: "createProduct", label: "Create Product" },
@@ -6244,224 +6495,7 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
       ════════════════════════════════════════════════ */}
       {mode === "editOrder" && (
         <div style={{ padding: "28px" }}>
-          {/* Order ID + Store */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "20px",
-              marginBottom: "24px",
-            }}
-          >
-            <div style={fieldWrap}>
-              <label style={labelStyle}>Order ID *</label>
-              <Autocomplete
-                options={editOrderSuggestions}
-                loading={isEditOrderSearching}
-                getOptionLabel={(o: any) =>
-                  o.name || o.id?.split("/").pop() || ""
-                }
-                isOptionEqualToValue={(o: any, v: any) => o.id === v.id}
-                filterOptions={(x) => x}
-                value={editSelectedOrder}
-                inputValue={editSearchInput}
-                onInputChange={(_, val, reason) => {
-                  if (reason === "input") {
-                    setEditSearchInput(val);
-                    if (editSearchDebounceRef.current)
-                      clearTimeout(editSearchDebounceRef.current);
-                    editSearchDebounceRef.current = setTimeout(() => {
-                      setEditSearchFilter(buildShopifyQuery(val));
-                    }, 400);
-                  }
-                }}
-                onChange={(_, selected) => {
-                  setEditSelectedOrder(selected);
-                  if (selected) {
-                    handleSelectEditOrder(selected, false);
-                  } else {
-                    setEditOrderId("");
-                    setLoadLineItemsOrderId("");
-                    setEditSearchInput("");
-                    setEditSearchFilter(undefined);
-                    setEditEmail("");
-                    setEditTags("");
-                    setEditAddr({ ...defaultAddress });
-                    setRemovedLineItemIds(new Set());
-                    setOperations([newOperation()]);
-                    resetEditOrder();
-                  }
-                }}
-                renderOption={(props, option: any) => {
-                  const { key, ...liProps } = props as any;
-                  const numericId = option.id?.split("/").pop() || "";
-                  return (
-                    <li key={key} {...liProps} style={{ padding: "6px 12px" }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "8px",
-                          flexWrap: "nowrap",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontWeight: 600,
-                            color: "#4f46e5",
-                            fontSize: "12px",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {option.name}
-                        </span>
-                        <span
-                          style={{
-                            color: "#9ca3af",
-                            fontSize: "11px",
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          #{numericId}
-                        </span>
-                        {option.email && (
-                          <span
-                            style={{
-                              color: "#6b7280",
-                              fontSize: "11px",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {option.email}
-                          </span>
-                        )}
-                        {option.shippingAddress?.firstName && (
-                          <span
-                            style={{
-                              color: "#9ca3af",
-                              fontSize: "11px",
-                              whiteSpace: "nowrap",
-                              marginLeft: "auto",
-                            }}
-                          >
-                            {option.shippingAddress.firstName}{" "}
-                            {option.shippingAddress.lastName}
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  );
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    placeholder="Search by order # or email…"
-                    size="small"
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: "8px",
-                        fontSize: "14px",
-                        "& fieldset": {
-                          borderColor: editOrderId ? "#6366f1" : "#e5e7eb",
-                        },
-                      },
-                    }}
-                    slotProps={{
-                      input: {
-                        ...params.InputProps,
-                        endAdornment: (
-                          <>
-                            {isEditOrderSearching && (
-                              <CircularProgress color="inherit" size={14} />
-                            )}
-                            {params.InputProps.endAdornment}
-                          </>
-                        ),
-                      },
-                    }}
-                  />
-                )}
-              />
-              <span
-                style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}
-              >
-                Type order # (e.g. 1001) or email to search
-              </span>
-            </div>
-            <div style={fieldWrap}>
-              <label style={labelStyle}>Store *</label>
-              <StoreDropdown
-                selectedLabel={selectedStoreOption?.label ?? ""}
-                onChange={(opt) => setSelectedStoreOption(opt)}
-                options={STORE_OPTIONS}
-              />
-            </div>
-          </div>
-
-          {/* ── Edit eligibility banner ── */}
-          {editOrderId.trim() && (
-            <div style={{ marginBottom: "20px" }}>
-              {isCheckingEligibility ? (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    background: "#f9fafb",
-                    border: "1px solid #e5e7eb",
-                    fontSize: "13px",
-                    color: "#6b7280",
-                  }}
-                >
-                  <CircularProgress size={13} />
-                  Checking edit eligibility…
-                </div>
-              ) : editEligibility && !editEligibility.canEdit ? (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    background: "#fef2f2",
-                    border: "1px solid #fca5a5",
-                    fontSize: "13px",
-                    color: "#dc2626",
-                    fontWeight: 500,
-                  }}
-                >
-                  {editEligibility.reason}
-                </div>
-              ) : editEligibility?.canEdit &&
-                editEligibility.remainingMinutes !== null ? (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    borderRadius: "8px",
-                    background:
-                      (editEligibility.remainingMinutes ?? 90) < 10
-                        ? "#fffbeb"
-                        : "#f0fdf4",
-                    border: `1px solid ${(editEligibility.remainingMinutes ?? 90) < 10 ? "#fde68a" : "#86efac"}`,
-                    fontSize: "13px",
-                    color:
-                      (editEligibility.remainingMinutes ?? 90) < 10
-                        ? "#b45309"
-                        : "#15803d",
-                    fontWeight: 500,
-                  }}
-                >
-                  {(editEligibility.remainingMinutes ?? 90) < 10
-                    ? `Editing window closing — ${editEligibility.remainingMinutes} min remaining`
-                    : `Order editable — ${editEligibility.remainingMinutes} min remaining`}
-                </div>
-              ) : null}
-            </div>
-          )}
-
+          {renderEditOrderSearchHeader()}
           {/* Sub-tabs */}
           <div
             style={{
@@ -6475,7 +6509,6 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
               [
                 { key: "details", label: "Update Details" },
                 { key: "lineItems", label: "Edit Line Items" },
-                { key: "cancel", label: "Cancel Order" },
               ] as { key: EditSubTab; label: string }[]
             ).map(({ key, label }) => (
               <button
@@ -7465,177 +7498,165 @@ const ShopifyOrderForm: React.FC<ShopifyOrderFormProps> = ({ onClose }) => {
             </form>
           )}
 
-          {/* ── Cancel Order sub-tab ── */}
-          {editSubTab === "cancel" && (
-            <form onSubmit={handleCancelOrder}>
-              {/* Eligibility block */}
-              {editEligibility?.canEdit === false && (
-                <div
-                  style={{
-                    marginBottom: "20px",
-                    padding: "12px 14px",
-                    borderRadius: "8px",
-                    background: "#fef2f2",
-                    border: "1px solid #fca5a5",
-                    fontSize: "13px",
-                    color: "#dc2626",
-                    fontWeight: 500,
-                  }}
-                >
-                  {editEligibility.reason}
-                </div>
-              )}
+        </div>
+      )}
 
-              {/* Reason */}
-              <div style={{ ...fieldWrap, marginBottom: "20px" }}>
-                <label style={labelStyle}>Cancellation Reason</label>
-                <select
-                  style={{ ...inputStyle, background: "#fff" }}
-                  value={cancelReason}
-                  onChange={(e) => setCancelReason(e.target.value)}
+      {/* ════════════════════════════════════════════════
+          CANCEL ORDER MODE
+      ════════════════════════════════════════════════ */}
+      {mode === "cancelOrder" && (
+        <div style={{ padding: "28px" }}>
+          {renderEditOrderSearchHeader()}
+          <form onSubmit={handleCancelOrder}>
+            {/* Reason */}
+            <div style={{ ...fieldWrap, marginBottom: "20px" }}>
+              <label style={labelStyle}>Cancellation Reason</label>
+              <select
+                style={{ ...inputStyle, background: "#fff" }}
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                disabled={editEligibility?.canEdit === false}
+              >
+                <option value="CUSTOMER">Customer</option>
+                <option value="FRAUD">Fraud</option>
+                <option value="INVENTORY">Inventory</option>
+                <option value="DECLINED">Declined</option>
+                <option value="STAFF">Staff</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+
+            {/* Options */}
+            <div
+              style={{
+                display: "flex",
+                gap: "28px",
+                marginBottom: "24px",
+                fontSize: "13px",
+                color: "#374151",
+              }}
+            >
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={cancelRefund}
+                  onChange={(e) => setCancelRefund(e.target.checked)}
                   disabled={editEligibility?.canEdit === false}
-                >
-                  <option value="CUSTOMER">Customer</option>
-                  <option value="FRAUD">Fraud</option>
-                  <option value="INVENTORY">Inventory</option>
-                  <option value="DECLINED">Declined</option>
-                  <option value="STAFF">Staff</option>
-                  <option value="OTHER">Other</option>
-                </select>
-              </div>
-
-              {/* Options */}
-              <div
+                />
+                Issue refund
+              </label>
+              <label
                 style={{
                   display: "flex",
-                  gap: "28px",
-                  marginBottom: "24px",
-                  fontSize: "13px",
-                  color: "#374151",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: "pointer",
                 }}
               >
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={cancelRefund}
-                    onChange={(e) => setCancelRefund(e.target.checked)}
-                    disabled={editEligibility?.canEdit === false}
-                  />
-                  Issue refund
-                </label>
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={cancelRestock}
-                    onChange={(e) => setCancelRestock(e.target.checked)}
-                    disabled={editEligibility?.canEdit === false}
-                  />
-                  Restock items
-                </label>
-              </div>
+                <input
+                  type="checkbox"
+                  checked={cancelRestock}
+                  onChange={(e) => setCancelRestock(e.target.checked)}
+                  disabled={editEligibility?.canEdit === false}
+                />
+                Restock items
+              </label>
+            </div>
 
-              {/* Confirmation checkbox */}
-              <div
+            {/* Confirmation checkbox */}
+            <div
+              style={{
+                marginBottom: "24px",
+                padding: "12px 14px",
+                borderRadius: "8px",
+                background: "#fffbeb",
+                border: "1px solid #fde68a",
+                fontSize: "13px",
+                color: "#92400e",
+              }}
+            >
+              <label
                 style={{
-                  marginBottom: "24px",
-                  padding: "12px 14px",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "10px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={cancelConfirmed}
+                  onChange={(e) => setCancelConfirmed(e.target.checked)}
+                  disabled={editEligibility?.canEdit === false}
+                  style={{ marginTop: "2px", flexShrink: 0 }}
+                />
+                I understand this action cannot be undone. I confirm I want to
+                cancel this order.
+              </label>
+            </div>
+
+            {/* Result */}
+            {(cancelData || cancelError) && (
+              <div style={{ marginBottom: "20px" }}>
+                <ResultBox data={cancelData} error={cancelError} />
+              </div>
+            )}
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                borderTop: "1px solid #f3f4f6",
+                paddingTop: "20px",
+              }}
+            >
+              <button
+                type="submit"
+                disabled={
+                  isCancelling ||
+                  isCheckingEligibility ||
+                  editEligibility?.canEdit === false ||
+                  !cancelConfirmed
+                }
+                title={
+                  editEligibility?.canEdit === false
+                    ? (editEligibility.reason ?? undefined)
+                    : undefined
+                }
+                style={{
+                  padding: "10px 28px",
+                  border: "none",
                   borderRadius: "8px",
-                  background: "#fffbeb",
-                  border: "1px solid #fde68a",
-                  fontSize: "13px",
-                  color: "#92400e",
-                }}
-              >
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "10px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={cancelConfirmed}
-                    onChange={(e) => setCancelConfirmed(e.target.checked)}
-                    disabled={editEligibility?.canEdit === false}
-                    style={{ marginTop: "2px", flexShrink: 0 }}
-                  />
-                  I understand this action cannot be undone. I confirm I want to
-                  cancel this order.
-                </label>
-              </div>
-
-              {/* Result */}
-              {(cancelData || cancelError) && (
-                <div style={{ marginBottom: "20px" }}>
-                  <ResultBox data={cancelData} error={cancelError} />
-                </div>
-              )}
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  borderTop: "1px solid #f3f4f6",
-                  paddingTop: "20px",
-                }}
-              >
-                <button
-                  type="submit"
-                  disabled={
+                  background:
                     isCancelling ||
                     isCheckingEligibility ||
                     editEligibility?.canEdit === false ||
                     !cancelConfirmed
-                  }
-                  title={
-                    editEligibility?.canEdit === false
-                      ? (editEligibility.reason ?? undefined)
-                      : undefined
-                  }
-                  style={{
-                    padding: "10px 28px",
-                    border: "none",
-                    borderRadius: "8px",
-                    background:
-                      isCancelling ||
-                      isCheckingEligibility ||
-                      editEligibility?.canEdit === false ||
-                      !cancelConfirmed
-                        ? "#fca5a5"
-                        : "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
-                    color: "#fff",
-                    cursor:
-                      isCancelling ||
-                      isCheckingEligibility ||
-                      editEligibility?.canEdit === false ||
-                      !cancelConfirmed
-                        ? "not-allowed"
-                        : "pointer",
-                    fontSize: "14px",
-                    fontWeight: 700,
-                  }}
-                >
-                  {isCancelling ? "Cancelling..." : "Cancel Order"}
-                </button>
-              </div>
-            </form>
-          )}
+                      ? "#fca5a5"
+                      : "linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)",
+                  color: "#fff",
+                  cursor:
+                    isCancelling ||
+                    isCheckingEligibility ||
+                    editEligibility?.canEdit === false ||
+                    !cancelConfirmed
+                      ? "not-allowed"
+                      : "pointer",
+                  fontSize: "14px",
+                  fontWeight: 700,
+                }}
+              >
+                {isCancelling ? "Cancelling..." : "Cancel Order"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

@@ -495,10 +495,14 @@ export const shopifyApi = createApi({
           displayFulfillmentStatus: string;
         } | null;
       },
-      { orderId: string; store?: ShopifyStore }
+      {
+        orderId: string;
+        store?: ShopifyStore;
+        action?: "edited" | "cancelled";
+      }
     >({
-      query: ({ orderId, store = "store1" }) => ({
-        url: `/shopify/order/${orderId}/edit-eligibility?store=${store}`,
+      query: ({ orderId, store = "store1", action = "edited" }) => ({
+        url: `/shopify/order/${orderId}/edit-eligibility?store=${store}&action=${action}`,
         method: "GET",
       }),
       transformResponse: (response: any) => ({
