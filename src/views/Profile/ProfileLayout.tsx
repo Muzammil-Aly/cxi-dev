@@ -9,6 +9,7 @@ import InventoryIcon from "@mui/icons-material/Inventory";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import InsightsIcon from "@mui/icons-material/Insights";
 import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
+import AssignmentReturnIcon from "@mui/icons-material/AssignmentReturn";
 import Sidebar from "./Sidebar";
 import GenieChatbot from "@/components/GenieChatbot";
 import GeniePanel from "@/components/GeniePanel";
@@ -85,6 +86,12 @@ const ProfileLayout: React.FC<ProfileLayoutProps> = ({
       label: "Parts Matrix",
       icon: <LibraryBooksIcon />,
       path: "/parts-matrix",
+    },
+    {
+      key: "Parts Requests",
+      label: "Parts Requests",
+      icon: <AssignmentReturnIcon />,
+      path: "/parts-requests",
     },
     {
       key: "Open Genie",
