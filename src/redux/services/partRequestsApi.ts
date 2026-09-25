@@ -1,7 +1,7 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
 import { baseQueryWithReauth } from "../baseQueryWithReauth";
 
-export type PartRequestTab = "needs_review" | "submitted";
+export type PartRequestTab = "needs_review" | "submitted" | "all";
 
 export interface PartRequestHeader {
   id: string;
@@ -14,6 +14,8 @@ export interface PartRequestHeader {
   review_type: string | null;
   retailer_name: string | null;
   zendesk_ticket_id: string | null;
+  store: string | null;
+  reason_code: string | null;
   shopify_draft_order_id: string | null;
   cxi_picked_up_at: string | null;
   submitted_at: string | null;
@@ -49,6 +51,7 @@ export interface PartRequestItem {
   request_type: string | null;
   image_urls: string[] | null;
   item_price: number | null;
+  item_total_refund_amount: number | null;
   created_at: string | null;
   parts: PartRequestPart[];
 }

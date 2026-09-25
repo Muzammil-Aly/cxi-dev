@@ -200,6 +200,45 @@ export const shopifyApi = createApi({
       }),
     }),
 
+    // Part Request 'refund' flow — read-only check: does the order/line/
+    // transaction exist? Shown in a preview modal before the reviewer confirms.
+    previewPartRequestRefund: builder.query<
+      {
+        orderFound: boolean;
+        order: { id: string; name: string } | null;
+        lineFound: boolean;
+        line: { id: string; title: string | null; currentQuantity: number | null } | null;
+        transactionFound: boolean;
+      },
+      { store?: ShopifyStore; order_no: string; sku: string }
+    >({
+      query: ({ store = "store1", order_no, sku }) => ({
+        url: `/shopify/part-request-refund/preview?store=${store}&order_no=${encodeURIComponent(order_no)}&sku=${encodeURIComponent(sku)}`,
+        method: "GET",
+      }),
+      transformResponse: (response: { data: any }) => response.data,
+    }),
+
+    // Part Request 'refund' flow — flat monetary refund on an existing order,
+    // matched by SKU. Manual only, triggered from the Part Request detail view.
+    createPartRequestRefund: builder.mutation<
+      any,
+      {
+        store?: ShopifyStore;
+        order_no: string;
+        sku: string;
+        amount: string;
+        note?: string;
+        notify?: boolean;
+      }
+    >({
+      query: ({ store = "store1", order_no, sku, amount, note, notify = false }) => ({
+        url: `/shopify/part-request-refund?store=${store}`,
+        method: "POST",
+        body: { order_no, sku, amount, note, notify },
+      }),
+    }),
+
     updateOrder: builder.mutation<
       any,
       {
@@ -630,6 +669,8 @@ export const {
   useLazyGetProductBySkuQuery,
   useCreateOrderMutation,
   useCreateDraftOrderMutation,
+  useLazyPreviewPartRequestRefundQuery,
+  useCreatePartRequestRefundMutation,
   useUpdateOrderMutation,
   useUpdateDraftOrderMutation,
   useGetOrderLineItemsQuery,

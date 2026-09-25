@@ -1,8 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import { Dialog, DialogContent } from "@mui/material";
 import { PartRequestDetail } from "@/redux/services/partRequestsApi";
+import {
+  useGetShopifyReturnReasonsQuery,
+  useGetShopifyReturnReasonsCodeQuery,
+  useCreateDraftOrderMutation,
+} from "@/redux/services/shopifyApi";
+import {
+  LineItemSearchFields,
+  PartsSubSection,
+  ResultBox,
+  SearchableDropdown,
+  STORE_OPTIONS,
+  type PartRow,
+} from "./ShopifyOrderForm";
 
 // ─── Styles (mirrors ShopifyOrderForm.tsx's visual language) ─────────────────
 
@@ -12,18 +26,6 @@ const inputStyle: React.CSSProperties = {
   border: "1.5px solid #e5e7eb",
   borderRadius: "8px",
   fontSize: "14px",
-  outline: "none",
-  background: "#fff",
-  color: "#111827",
-  boxSizing: "border-box",
-};
-
-const cellInputStyle: React.CSSProperties = {
-  width: "100%",
-  padding: "6px 8px",
-  border: "1px solid #e5e7eb",
-  borderRadius: "6px",
-  fontSize: "13px",
   outline: "none",
   background: "#fff",
   color: "#111827",
@@ -52,15 +54,56 @@ const fieldWrap: React.CSSProperties = {
   flexDirection: "column",
 };
 
-const STORES = ["store1", "store2", "store3", "store4", "store5"];
+// Match the request's store to a Create Order store option by full label or by
+// its code prefix (e.g. "CP02"). Read-only: nothing here is written anywhere.
+export function matchStoreOption(raw: string | null | undefined) {
+  const v = (raw || "").trim().toLowerCase();
+  if (!v) return null;
+  return (
+    STORE_OPTIONS.find((o) => o.label.toLowerCase() === v) ||
+    STORE_OPTIONS.find((o) => o.label.split("-")[0].trim().toLowerCase() === v) ||
+    STORE_OPTIONS.find((o) => v.startsWith(o.label.split("-")[0].trim().toLowerCase())) ||
+    null
+  );
+}
 
 interface DraftLineItem {
   key: string;
-  title: string;
-  sku: string;
+  item_no: string;
+  lot_no: string | null;
+  unit_price: number | null;
   quantity: number;
-  price: string;
+  description: string;
+  reason_code?: string;
+  parts: PartRow[];
 }
+
+const EMPTY_LINE_ITEM = (key: string): DraftLineItem => ({
+  key,
+  item_no: "",
+  lot_no: null,
+  unit_price: null,
+  quantity: 1,
+  description: "",
+  parts: [],
+});
+
+const smallLabelStyle: React.CSSProperties = {
+  fontSize: "11px",
+  fontWeight: 600,
+  color: "#6b7280",
+};
+
+const readOnlyBoxStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  padding: "8px 12px",
+  border: "1.5px solid #e5e7eb",
+  borderRadius: "8px",
+  fontSize: "13px",
+  background: "#f9fafb",
+  gap: "6px",
+};
 
 function splitName(fullName: string | null | undefined): { firstName: string; lastName: string } {
   const trimmed = (fullName || "").trim();
@@ -75,11 +118,10 @@ function buildLineItems(request: PartRequestDetail): DraftLineItem[] {
   for (const item of request.items) {
     for (const part of item.parts) {
       rows.push({
-        key: `${item.id}-${part.id}`,
-        title: part.part_name || part.part_number || `Part #${part.part_no ?? ""}`,
-        sku: part.part_sku || part.part_number || "",
+        ...EMPTY_LINE_ITEM(`${item.id}-${part.id}`),
+        item_no: part.part_sku || part.part_number || "",
+        description: part.part_name || part.part_number || `Part #${part.part_no ?? ""}`,
         quantity: part.quantity ?? 1,
-        price: "",
       });
     }
   }
@@ -97,7 +139,8 @@ export default function PartRequestDraftOrderForm({
 }) {
   const header = request.header;
 
-  const [store, setStore] = useState("store1");
+  const [storeLabel, setStoreLabel] = useState("");
+  const [storeOption, setStoreOption] = useState<(typeof STORE_OPTIONS)[number] | null>(null);
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -108,13 +151,32 @@ export default function PartRequestDraftOrderForm({
   const [zip, setZip] = useState("");
   const [country, setCountry] = useState("");
   const [phone, setPhone] = useState("");
-  const [note, setNote] = useState("");
+  const [company, setCompany] = useState("");
+  const [zendeskTicket, setZendeskTicket] = useState("");
+  const [reasonCode, setReasonCode] = useState("");
   const [lineItems, setLineItems] = useState<DraftLineItem[]>([]);
+  const { data: returnReasonsData } = useGetShopifyReturnReasonsQuery();
+  const { data: headerReasonsData } = useGetShopifyReturnReasonsCodeQuery();
+  const reasonCodeLabel = (() => {
+    const match = (headerReasonsData?.data ?? []).find((r) => r.Code === reasonCode);
+    return match ? `${match.Code} — ${match.Description}` : reasonCode;
+  })();
+  const lineReasonCodeOptions = (returnReasonsData?.data ?? []).map((r) => ({
+    value: r.Code,
+    label: `${r.Code} — ${r.Description}`,
+  }));
+
+  const [createDraftOrder, { isLoading: isDraftLoading, data: draftData, error: draftError, reset: resetDraft }] =
+    useCreateDraftOrderMutation();
+  const zipLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    resetDraft();
     const { firstName: fn, lastName: ln } = splitName(header.customer_name);
-    setStore("store1");
+    const storeOpt = matchStoreOption(header.store);
+    setStoreOption(storeOpt);
+    setStoreLabel(storeOpt?.label ?? (header.store as string) ?? "");
     setEmail(header.customer_email || "");
     setFirstName(fn);
     setLastName(ln);
@@ -125,24 +187,128 @@ export default function PartRequestDraftOrderForm({
     setZip((header.zip as string) || "");
     setCountry((header.country as string) || "");
     setPhone(header.customer_phone || "");
-    setNote(
-      `Part Request ${header.order_no || ""}${header.zendesk_ticket_id ? ` (Zendesk #${header.zendesk_ticket_id})` : ""}`.trim()
-    );
+    setCompany("");
+    setZendeskTicket((header.zendesk_ticket_id as string) || "");
+    setReasonCode((header.reason_code as string) || "");
     setLineItems(buildLineItems(request));
   }, [open, request, header]);
 
-  const updateLineItem = (key: string, field: keyof DraftLineItem, value: string | number) => {
-    setLineItems((rows) => rows.map((r) => (r.key === key ? { ...r, [field]: value } : r)));
+  const patchLineItem = (key: string, patch: Partial<DraftLineItem>) => {
+    setLineItems((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   };
 
   const removeLineItem = (key: string) => {
     setLineItems((rows) => rows.filter((r) => r.key !== key));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const addLineItem = () => {
+    setLineItems((rows) => [...rows, EMPTY_LINE_ITEM(`new-${Date.now()}-${rows.length}`)]);
+  };
+
+  const handleZipChange = (value: string) => {
+    setZip(value);
+    if (zipLookupRef.current) clearTimeout(zipLookupRef.current);
+    if (!value || value.length < 3) return;
+    zipLookupRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`https://api.zippopotam.us/us/${value}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const place = data?.places?.[0];
+        if (!place) return;
+        const stateAbbr: string = place["state abbreviation"] ?? "";
+        const placeName: string = place["place name"] ?? "";
+        if (stateAbbr) setProvince(stateAbbr);
+        if (placeName) setCity(placeName);
+        setCountry(data["country abbreviation"] ?? "US");
+      } catch {
+        // silently ignore lookup failures
+      }
+    }, 500);
+  };
+
+  const vendorCode = (storeOption?.label ?? "").split("-")[0].trim().replace(/\s+/g, "");
+
+  // Same payload rules as Create Order: order-level reason code and Zendesk
+  // ticket ride on every line item's properties (the backend turns them into
+  // tags), parts expand to their own lines, and CP02/CP05 parts are $0.
+  const buildLineItemsPayload = () => {
+    const forcePartsZeroPrice = vendorCode === "CP02" || vendorCode === "CP05";
+    const result: any[] = [];
+
+    for (const item of lineItems) {
+      const properties: { name: string; value: string }[] = [];
+      if (item.item_no) properties.push({ name: "item_no", value: item.item_no });
+      if (item.lot_no) properties.push({ name: "lot_no", value: item.lot_no });
+      if (item.unit_price != null) properties.push({ name: "unit_price", value: String(item.unit_price) });
+      if (reasonCode) properties.push({ name: "reason_code", value: reasonCode });
+      if (zendeskTicket.trim()) properties.push({ name: "external_doc_info", value: zendeskTicket.trim() });
+
+      const activeParts = (item.parts ?? []).filter((p) => p.parts_item_no);
+      if (activeParts.length > 0) {
+        for (const part of activeParts) {
+          const partProps = [...properties];
+          if (part.reason_code) partProps.push({ name: "return_reason_code", value: part.reason_code });
+          if (part.touchup_color) partProps.push({ name: "touchup_color", value: part.touchup_color });
+          result.push({
+            quantity: part.parts_qty,
+            title: part.parts_item_no,
+            price: forcePartsZeroPrice ? "0.00" : part.parts_unit_price != null ? String(part.parts_unit_price) : "0.00",
+            sku: part.parts_item_no,
+            ...(partProps.length > 0 && { properties: partProps }),
+          });
+        }
+      } else {
+        const lineProps = [...properties];
+        if (item.reason_code) lineProps.push({ name: "return_reason_code", value: item.reason_code });
+        result.push({
+          quantity: item.quantity,
+          title: item.description || item.item_no || "Custom Item",
+          price: item.unit_price != null ? String(item.unit_price) : "0.00",
+          sku: item.item_no || undefined,
+          ...(lineProps.length > 0 && { properties: lineProps }),
+        });
+      }
+    }
+    return result;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Preview only — not wired to Shopify or any backend call yet.
-    onClose();
+    if (!storeOption) {
+      toast.error("This part request's store doesn't match a known store.");
+      return;
+    }
+    if (lineItems.length === 0) {
+      toast.error("Add at least one line item.");
+      return;
+    }
+    try {
+      await createDraftOrder({
+        store: storeOption.value,
+        email,
+        tags: [],
+        washWholeUnit: false,
+        lineItems: buildLineItemsPayload(),
+        shippingAddress: {
+          firstName,
+          lastName,
+          address1,
+          address2,
+          company,
+          city,
+          provinceCode: province,
+          countryCode: country,
+          zip,
+          phone,
+        },
+        vendor: vendorCode,
+      }).unwrap();
+      toast.success("Draft order created successfully!");
+    } catch (err) {
+      console.error(err);
+      toast.error("Error creating draft order");
+    }
   };
 
   return (
@@ -196,7 +362,7 @@ export default function PartRequestDraftOrderForm({
                   Create Draft Order
                 </div>
                 <div style={{ color: "rgba(255,255,255,0.78)", fontSize: "13px", marginTop: "2px" }}>
-                  Prefilled from Part Request {header.order_no || header.id} — preview only, not yet submitted
+                  Prefilled from Part Request {header.order_no || header.id}
                 </div>
               </div>
             </div>
@@ -224,16 +390,15 @@ export default function PartRequestDraftOrderForm({
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
               <div style={fieldWrap}>
                 <label style={labelStyle}>Store *</label>
-                <select style={inputStyle} value={store} onChange={(e) => setStore(e.target.value)}>
-                  {STORES.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                <div style={{ ...inputStyle, background: "#f3f4f6", color: storeLabel ? "#374151" : "#9ca3af", cursor: "not-allowed" }}>
+                  {storeLabel || "—"}
+                </div>
               </div>
               <div style={fieldWrap}>
                 <label style={labelStyle}>Customer Email *</label>
                 <input
                   type="email"
+                  required
                   style={inputStyle}
                   placeholder="e.g., customer@email.com"
                   value={email}
@@ -242,30 +407,29 @@ export default function PartRequestDraftOrderForm({
               </div>
             </div>
 
-            {/* Names + phone */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+            {/* Reason Code (read-only) + Zendesk Ticket # */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "20px" }}>
               <div style={fieldWrap}>
-                <label style={labelStyle}>First Name *</label>
-                <input style={inputStyle} placeholder="e.g., John" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                <label style={labelStyle}>Reason Code</label>
+                <div style={{ ...inputStyle, background: "#f3f4f6", color: reasonCodeLabel ? "#374151" : "#9ca3af", cursor: "not-allowed" }}>
+                  {reasonCodeLabel || "—"}
+                </div>
               </div>
               <div style={fieldWrap}>
-                <label style={labelStyle}>Last Name *</label>
-                <input style={inputStyle} placeholder="e.g., Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                <label style={labelStyle}>Zendesk Ticket #</label>
+                <input
+                  style={inputStyle}
+                  type="text"
+                  placeholder="zendesk_"
+                  value={zendeskTicket}
+                  onChange={(e) => setZendeskTicket(e.target.value)}
+                />
+                {`zendesk_${zendeskTicket}`.length > 40 && (
+                  <span style={{ fontSize: "11px", marginTop: "3px", color: "#dc2626" }}>
+                    Tag limit exceeded: "zendesk_{zendeskTicket}" is {`zendesk_${zendeskTicket}`.length} characters (max 40).
+                  </span>
+                )}
               </div>
-              <div style={fieldWrap}>
-                <label style={labelStyle}>Phone</label>
-                <input style={inputStyle} placeholder="e.g., +1 555 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              </div>
-            </div>
-
-            {/* Note */}
-            <div style={{ ...fieldWrap, marginBottom: "20px" }}>
-              <label style={labelStyle}>Note</label>
-              <textarea
-                style={{ ...inputStyle, minHeight: "56px", resize: "vertical", fontFamily: "inherit" }}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-              />
             </div>
 
             {/* Line Items */}
@@ -273,77 +437,200 @@ export default function PartRequestDraftOrderForm({
               <label style={{ ...labelStyle, marginBottom: "10px" }}>
                 Line Items * ({lineItems.length})
               </label>
-              <div style={{ border: "1.5px solid #e5e7eb", borderRadius: "8px", overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ background: "#f9fafb" }}>
-                      {["Title", "SKU", "Qty", "Price", ""].map((h) => (
-                        <th
-                          key={h}
+
+              {lineItems.map((item, index) => {
+                return (
+                  <div
+                    key={item.key}
+                    style={{
+                      border: "1.5px solid #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "14px 16px",
+                      marginBottom: "10px",
+                      background: "#fff",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.05)",
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          color: "#6366f1",
+                          background: "#ede9fe",
+                          borderRadius: "4px",
+                          padding: "2px 8px",
+                        }}
+                      >
+                        Line {index + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeLineItem(item.key)}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: "18px", lineHeight: 1, padding: "0 2px" }}
+                        title="Remove line item"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {item.description && (
+                      <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "10px" }}>
+                        Requested part: <strong style={{ color: "#374151" }}>{item.description}</strong>
+                      </div>
+                    )}
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr) 90px", gap: "10px" }}>
+                      {item.item_no || item.lot_no ? (
+                        <>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <span style={smallLabelStyle}>Item No</span>
+                            <div style={{ ...readOnlyBoxStyle, color: item.item_no ? "#111827" : "#9ca3af" }}>
+                              <span style={{ flex: 1 }}>{item.item_no || "—"}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  patchLineItem(item.key, {
+                                    item_no: "",
+                                    lot_no: null,
+                                    unit_price: null,
+                                  })
+                                }
+                                style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", fontSize: "14px", lineHeight: 1, padding: 0 }}
+                                title="Clear item / lot"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <span style={smallLabelStyle}>Lot No</span>
+                            <div style={{ ...readOnlyBoxStyle, color: item.lot_no ? "#111827" : "#9ca3af" }}>
+                              {item.lot_no || "—"}
+                            </div>
+                          </div>
+                        </>
+                      ) : (
+                        <LineItemSearchFields
+                          skipShopifyCheck
+                          onPopulate={({
+                            item_no,
+                            lot_no,
+                            unit_price,
+                          }) =>
+                            patchLineItem(item.key, {
+                              item_no,
+                              lot_no: lot_no || null,
+                              unit_price: unit_price ?? null,
+                              quantity: 1,
+                            })
+                          }
+                        />
+                      )}
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <span style={smallLabelStyle}>Unit Price</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={item.unit_price ?? ""}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            patchLineItem(item.key, { unit_price: isNaN(v) ? null : v });
+                          }}
+                          placeholder="0.00"
                           style={{
-                            textAlign: "left",
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            color: "#6b7280",
-                            textTransform: "uppercase",
-                            letterSpacing: "0.04em",
-                            padding: "10px 12px",
-                            borderBottom: "1px solid #e5e7eb",
+                            ...inputStyle,
+                            fontSize: "13px",
+                            padding: "8px 12px",
+                            ...(item.unit_price == null || Number(item.unit_price) === 0
+                              ? { border: "1.5px solid #f59e0b", background: "#fffbeb" }
+                              : {}),
+                          }}
+                        />
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <span style={smallLabelStyle}>Line Amount</span>
+                        <div
+                          style={{
+                            padding: "8px 12px",
+                            border: "1.5px solid #e5e7eb",
+                            borderRadius: "8px",
+                            fontSize: "13px",
+                            color: item.unit_price != null ? "#047857" : "#9ca3af",
+                            background: item.unit_price != null ? "#f0fdf4" : "#f9fafb",
+                            fontWeight: item.unit_price != null ? 600 : 400,
                           }}
                         >
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lineItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} style={{ textAlign: "center", padding: "20px", color: "#9ca3af", fontSize: "13px" }}>
-                          No line items
-                        </td>
-                      </tr>
-                    ) : (
-                      lineItems.map((row) => (
-                        <tr key={row.key} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                          <td style={{ padding: "8px 12px" }}>
-                            <input style={cellInputStyle} value={row.title} onChange={(e) => updateLineItem(row.key, "title", e.target.value)} />
-                          </td>
-                          <td style={{ padding: "8px 12px", width: "150px" }}>
-                            <input style={cellInputStyle} value={row.sku} onChange={(e) => updateLineItem(row.key, "sku", e.target.value)} />
-                          </td>
-                          <td style={{ padding: "8px 12px", width: "70px" }}>
-                            <input
-                              type="number"
-                              style={cellInputStyle}
-                              value={row.quantity}
-                              onChange={(e) => updateLineItem(row.key, "quantity", Number(e.target.value))}
-                            />
-                          </td>
-                          <td style={{ padding: "8px 12px", width: "100px" }}>
-                            <input
-                              style={cellInputStyle}
-                              placeholder="0.00"
-                              value={row.price}
-                              onChange={(e) => updateLineItem(row.key, "price", e.target.value)}
-                            />
-                          </td>
-                          <td style={{ padding: "8px 12px", width: "40px", textAlign: "center" }}>
-                            <button
-                              type="button"
-                              onClick={() => removeLineItem(row.key)}
-                              style={{ background: "none", border: "none", color: "#ef4444", cursor: "pointer", fontSize: "16px", lineHeight: 1 }}
-                              aria-label="Remove line item"
-                            >
-                              ✕
-                            </button>
-                          </td>
-                        </tr>
-                      ))
+                          {item.unit_price != null ? `$${(Number(item.unit_price) * item.quantity).toFixed(2)}` : "—"}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <span style={smallLabelStyle}>Qty</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={5}
+                          value={item.quantity}
+                          onKeyDown={(e) => {
+                            if (/^[0-9]$/.test(e.key)) (e.target as HTMLInputElement).select();
+                          }}
+                          onChange={(e) => {
+                            const parsed = parseInt(e.target.value, 10);
+                            if (isNaN(parsed)) return;
+                            patchLineItem(item.key, { quantity: Math.min(5, Math.max(1, parsed)) });
+                          }}
+                          required
+                          placeholder="Qty"
+                          style={inputStyle}
+                        />
+                      </div>
+                    </div>
+
+                    {(!item.parts || item.parts.length === 0) && (
+                      <div style={{ marginTop: "10px" }}>
+                        <span style={{ ...smallLabelStyle, display: "block", marginBottom: "4px" }}>
+                          Return Reason Code
+                        </span>
+                        <SearchableDropdown
+                          value={item.reason_code ?? ""}
+                          onChange={(val) => patchLineItem(item.key, { reason_code: val || undefined })}
+                          options={lineReasonCodeOptions}
+                          placeholder="— select return reason code —"
+                        />
+                      </div>
                     )}
-                  </tbody>
-                </table>
-              </div>
+
+                    <PartsSubSection
+                      item_no={item.item_no || undefined}
+                      lot_no={item.lot_no}
+                      parts={item.parts ?? []}
+                      onChange={(parts) => patchLineItem(item.key, { parts })}
+                      reasonCodeOptions={lineReasonCodeOptions}
+                    />
+                  </div>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={addLineItem}
+                style={{
+                  padding: "8px 16px",
+                  border: "1.5px dashed #a5b4fc",
+                  borderRadius: "8px",
+                  background: "#f5f3ff",
+                  color: "#4f46e5",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                + Add Line Item
+              </button>
             </div>
 
             {/* Shipping Address */}
@@ -351,8 +638,16 @@ export default function PartRequestDraftOrderForm({
               <div style={sectionHeaderStyle}>Shipping Address</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                 <div style={fieldWrap}>
+                  <label style={labelStyle}>First Name *</label>
+                  <input style={inputStyle} required placeholder="e.g., John" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                </div>
+                <div style={fieldWrap}>
+                  <label style={labelStyle}>Last Name *</label>
+                  <input style={inputStyle} required placeholder="e.g., Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                </div>
+                <div style={fieldWrap}>
                   <label style={labelStyle}>Address Line 1 *</label>
-                  <input style={inputStyle} placeholder="e.g., 123 Main St" value={address1} onChange={(e) => setAddress1(e.target.value)} />
+                  <input style={inputStyle} required placeholder="e.g., 123 Main St" value={address1} onChange={(e) => setAddress1(e.target.value)} />
                 </div>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Address Line 2</label>
@@ -360,22 +655,42 @@ export default function PartRequestDraftOrderForm({
                 </div>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>City *</label>
-                  <input style={inputStyle} placeholder="e.g., New York" value={city} onChange={(e) => setCity(e.target.value)} />
+                  <input style={inputStyle} required placeholder="e.g., New York" value={city} onChange={(e) => setCity(e.target.value)} />
                 </div>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>ZIP / Postal Code *</label>
-                  <input style={inputStyle} placeholder="e.g., 10001" value={zip} onChange={(e) => setZip(e.target.value)} />
+                  <input style={inputStyle} required placeholder="e.g., 10001" value={zip} onChange={(e) => handleZipChange(e.target.value)} />
                 </div>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Province / State Code *</label>
-                  <input style={inputStyle} placeholder="e.g., NY" value={province} onChange={(e) => setProvince(e.target.value)} />
+                  <input style={inputStyle} required placeholder="e.g., NY" value={province} onChange={(e) => setProvince(e.target.value)} />
                 </div>
                 <div style={fieldWrap}>
                   <label style={labelStyle}>Country Code *</label>
-                  <input style={inputStyle} placeholder="e.g., US" value={country} onChange={(e) => setCountry(e.target.value)} />
+                  <input style={inputStyle} required placeholder="e.g., US" value={country} onChange={(e) => setCountry(e.target.value)} />
+                </div>
+                <div style={fieldWrap}>
+                  <label style={labelStyle}>Company</label>
+                  <input style={inputStyle} placeholder="e.g., Acme Inc." value={company} onChange={(e) => setCompany(e.target.value)} />
+                </div>
+                <div style={fieldWrap}>
+                  <label style={labelStyle}>Phone</label>
+                  <input style={inputStyle} placeholder="e.g., +1 555 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
                 </div>
               </div>
             </div>
+
+            <ResultBox
+              data={draftData}
+              error={draftError}
+              successColor="#0369a1"
+              successBg="#f0f9ff"
+              adminUrl={
+                draftData?.data?.id && storeOption?.handle
+                  ? `https://admin.shopify.com/store/${storeOption.handle}/draft_orders/${draftData.data.id.split("/").pop()}`
+                  : undefined
+              }
+            />
 
             {/* Footer */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f3f4f6", paddingTop: "20px" }}>
@@ -397,18 +712,20 @@ export default function PartRequestDraftOrderForm({
               </button>
               <button
                 type="submit"
+                disabled={isDraftLoading}
                 style={{
                   padding: "10px 28px",
                   border: "none",
                   borderRadius: "8px",
                   background: "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)",
                   color: "#fff",
-                  cursor: "pointer",
+                  cursor: isDraftLoading ? "not-allowed" : "pointer",
+                  opacity: isDraftLoading ? 0.7 : 1,
                   fontSize: "14px",
                   fontWeight: 700,
                 }}
               >
-                Submit (Preview Only)
+                {isDraftLoading ? "Creating..." : "Create Draft Order"}
               </button>
             </div>
           </form>
