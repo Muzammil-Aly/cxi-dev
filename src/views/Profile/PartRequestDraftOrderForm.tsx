@@ -57,8 +57,10 @@ const fieldWrap: React.CSSProperties = {
 
 // Match the request's store to a Create Order store option by full label or by
 // its code prefix (e.g. "CP02"). Read-only: nothing here is written anywhere.
-export function matchStoreOption(raw: string | null | undefined) {
-  const v = (raw || "").trim().toLowerCase();
+export function matchStoreOption(raw: unknown) {
+  // raw is typed as a string, but data from the API isn't guaranteed to
+  // actually be one at runtime — String(...) guards against a .trim() crash.
+  const v = (raw != null ? String(raw) : "").trim().toLowerCase();
   if (!v) return null;
   return (
     STORE_OPTIONS.find((o) => o.label.toLowerCase() === v) ||
@@ -207,7 +209,10 @@ export default function PartRequestDraftOrderForm({
     setCountry((header.country as string) || "");
     setPhone(header.customer_phone || "");
     setCompany("");
-    setZendeskTicket((header.zendesk_ticket_id as string) || "");
+    // zendesk_ticket_id can come back as a number, not a string — `as string`
+    // is only a type assertion, it doesn't convert, so .trim() later would
+    // throw on a real number. String(...) actually converts it.
+    setZendeskTicket(header.zendesk_ticket_id != null ? String(header.zendesk_ticket_id) : "");
     setReasonCode((header.reason_code as string) || "");
 
     // Wait for the whole-unit check before showing any line items, so the
