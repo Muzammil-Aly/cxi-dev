@@ -126,6 +126,11 @@ function RefundAction({
     setEditSku(sku ?? "");
     setEditAmount(amount != null ? String(amount) : "");
     setOpen(true);
+    // Auto-run the check on open — no need to click Check the first time,
+    // only if the reviewer then edits a field and wants to re-verify.
+    if (store && orderNo?.trim() && sku?.trim()) {
+      triggerPreview({ store: store.value, order_no: orderNo.trim(), sku: sku.trim() });
+    }
   };
 
   const runCheck = () => {
@@ -279,18 +284,22 @@ function RefundAction({
                 ok={preview.orderFound}
                 label={preview.orderFound ? `Order found (${preview.order?.name})` : "Order not found"}
               />
-              <RefundCheckRow
-                ok={preview.lineFound}
-                label={
-                  preview.lineFound
-                    ? `Matching line found — ${preview.line?.title ?? "item"} (qty ${preview.line?.currentQuantity ?? "—"} refundable)`
-                    : "No line on this order matches that SKU (or it's already fully refunded)"
-                }
-              />
-              <RefundCheckRow
-                ok={preview.transactionFound}
-                label={preview.transactionFound ? "Refundable payment transaction found" : "No refundable payment transaction on this order"}
-              />
+              {preview.orderFound && (
+                <>
+                  <RefundCheckRow
+                    ok={preview.lineFound}
+                    label={
+                      preview.lineFound
+                        ? `Matching line found — ${preview.line?.title ?? "item"} (qty ${preview.line?.currentQuantity ?? "—"} refundable)`
+                        : "No line on this order matches that SKU (or it's already fully refunded)"
+                    }
+                  />
+                  <RefundCheckRow
+                    ok={preview.transactionFound}
+                    label={preview.transactionFound ? "Refundable payment transaction found" : "No refundable payment transaction on this order"}
+                  />
+                </>
+              )}
               {!canConfirm && (
                 <Alert severity="warning" sx={{ mt: 1, fontSize: 12 }}>
                   This can't be refunded until every check above passes.

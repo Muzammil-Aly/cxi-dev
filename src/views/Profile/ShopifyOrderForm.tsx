@@ -561,7 +561,12 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
     if (open) setTimeout(() => inputRef.current?.focus(), 50);
   }, [open]);
 
-  const selected = options.find((o) => o.value === value);
+  // Trimmed, case-insensitive match — data sourced from other tables (e.g.
+  // part-request reason codes) doesn't always match this list's casing
+  // exactly, and a strict match silently shows the placeholder instead.
+  const selected = options.find(
+    (o) => o.value.trim().toLowerCase() === value.trim().toLowerCase(),
+  );
   const filtered = search
     ? options.filter(
         (o) =>
@@ -586,11 +591,14 @@ export const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
           fontSize: "14px",
           cursor: "pointer",
           background: "#fff",
-          color: selected ? "#111827" : "#9ca3af",
+          color: selected || value ? "#111827" : "#9ca3af",
           transition: "border-color 0.15s",
         }}
       >
-        <span>{selected?.label ?? placeholder ?? "— select —"}</span>
+        {/* A set value with no matching option (code not in this list, or
+            differently cased) still shows the raw code — we already have it
+            from its source table, so it should never look empty. */}
+        <span>{selected?.label ?? (value || placeholder) ?? "— select —"}</span>
         <svg
           width="16"
           height="16"

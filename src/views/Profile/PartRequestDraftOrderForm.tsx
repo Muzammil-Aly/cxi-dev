@@ -9,6 +9,7 @@ import {
   useGetShopifyReturnReasonsCodeQuery,
   useCreateDraftOrderMutation,
 } from "@/redux/services/shopifyApi";
+import { useLazyGetAutoWholeunitPartsQuery } from "@/redux/services/InventoryApi";
 import {
   LineItemSearchFields,
   PartsSubSection,
@@ -113,19 +114,35 @@ function splitName(fullName: string | null | undefined): { firstName: string; la
   return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
 }
 
-function buildLineItems(request: PartRequestDetail): DraftLineItem[] {
-  const rows: DraftLineItem[] = [];
-  for (const item of request.items) {
-    for (const part of item.parts) {
-      rows.push({
-        ...EMPTY_LINE_ITEM(`${item.id}-${part.id}`),
-        item_no: part.part_sku || part.part_number || "",
-        description: part.part_name || part.part_number || `Part #${part.part_no ?? ""}`,
-        quantity: part.quantity ?? 1,
-      });
-    }
-  }
-  return rows;
+// If any of an item's parts is flagged AutoWholeunitSales in Databricks
+// (main.staging.parts_parts_lot, matched by part_number), that item is
+// normally handled as a whole-unit replacement — show it as one simple
+// line with no Parts Line Items breakdown, instead of listing each part.
+function buildLineItems(request: PartRequestDetail, autoWholeunitPartNumbers: Set<string>): DraftLineItem[] {
+  return request.items.map((item) => {
+    const wholeUnitPart = item.parts.find(
+      (part) => part.part_number && autoWholeunitPartNumbers.has(part.part_number),
+    );
+
+    return {
+      ...EMPTY_LINE_ITEM(String(item.id)),
+      item_no: item.sku || "",
+      lot_no: item.lot_number || null,
+      description: wholeUnitPart
+        ? wholeUnitPart.part_name || `Whole Unit (${wholeUnitPart.part_sku || wholeUnitPart.part_number})`
+        : item.product_name || item.description || item.sku || "",
+      // Line-level reason code — shown/used when this item has no parts.
+      reason_code: item.return_reason_code || undefined,
+      parts: wholeUnitPart
+        ? []
+        : item.parts.map((part) => ({
+            parts_item_no: part.part_sku || part.part_number || "",
+            parts_qty: part.quantity ?? 1,
+            parts_unit_price: null,
+            reason_code: item.return_reason_code || undefined,
+          })),
+    };
+  });
 }
 
 export default function PartRequestDraftOrderForm({
@@ -155,6 +172,7 @@ export default function PartRequestDraftOrderForm({
   const [zendeskTicket, setZendeskTicket] = useState("");
   const [reasonCode, setReasonCode] = useState("");
   const [lineItems, setLineItems] = useState<DraftLineItem[]>([]);
+  const [isCheckingWholeUnit, setIsCheckingWholeUnit] = useState(false);
   const { data: returnReasonsData } = useGetShopifyReturnReasonsQuery();
   const { data: headerReasonsData } = useGetShopifyReturnReasonsCodeQuery();
   const reasonCodeLabel = (() => {
@@ -168,6 +186,7 @@ export default function PartRequestDraftOrderForm({
 
   const [createDraftOrder, { isLoading: isDraftLoading, data: draftData, error: draftError, reset: resetDraft }] =
     useCreateDraftOrderMutation();
+  const [triggerAutoWholeunitCheck] = useLazyGetAutoWholeunitPartsQuery();
   const zipLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -190,7 +209,29 @@ export default function PartRequestDraftOrderForm({
     setCompany("");
     setZendeskTicket((header.zendesk_ticket_id as string) || "");
     setReasonCode((header.reason_code as string) || "");
-    setLineItems(buildLineItems(request));
+
+    // Wait for the whole-unit check before showing any line items, so the
+    // parts breakdown never flashes and then collapses — it just renders
+    // correctly the first time.
+    setLineItems([]);
+    const allPartNumbers = request.items.flatMap((item) =>
+      item.parts.map((part) => part.part_number).filter((n): n is string => !!n),
+    );
+    if (allPartNumbers.length === 0) {
+      setLineItems(buildLineItems(request, new Set()));
+      return;
+    }
+    setIsCheckingWholeUnit(true);
+    triggerAutoWholeunitCheck(allPartNumbers)
+      .unwrap()
+      .then(({ autoWholeunitPartNumbers }) => {
+        setLineItems(buildLineItems(request, new Set(autoWholeunitPartNumbers)));
+      })
+      .catch(() => {
+        // Check failed — fall back to the normal parts breakdown.
+        setLineItems(buildLineItems(request, new Set()));
+      })
+      .finally(() => setIsCheckingWholeUnit(false));
   }, [open, request, header]);
 
   const patchLineItem = (key: string, patch: Partial<DraftLineItem>) => {
@@ -287,7 +328,9 @@ export default function PartRequestDraftOrderForm({
       await createDraftOrder({
         store: storeOption.value,
         email,
-        tags: [],
+        // Identifies this draft order as submitted from the Part Request
+        // flow, not the main Create Order (ShopifyOrderForm) flow.
+        tags: ["parts_request_form"],
         washWholeUnit: false,
         lineItems: buildLineItemsPayload(),
         shippingAddress: {
@@ -438,7 +481,23 @@ export default function PartRequestDraftOrderForm({
                 Line Items * ({lineItems.length})
               </label>
 
-              {lineItems.map((item, index) => {
+              {isCheckingWholeUnit ? (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "14px 16px",
+                    border: "1.5px solid #e5e7eb",
+                    borderRadius: "12px",
+                    color: "#6b7280",
+                    fontSize: "13px",
+                  }}
+                >
+                  Checking parts…
+                </div>
+              ) : (
+                lineItems.map((item, index) => {
                 return (
                   <div
                     key={item.key}
@@ -613,7 +672,8 @@ export default function PartRequestDraftOrderForm({
                     />
                   </div>
                 );
-              })}
+                })
+              )}
 
               <button
                 type="button"

@@ -52,6 +52,7 @@ export interface PartRequestItem {
   image_urls: string[] | null;
   item_price: number | null;
   item_total_refund_amount: number | null;
+  return_reason_code: string | null;
   created_at: string | null;
   parts: PartRequestPart[];
 }

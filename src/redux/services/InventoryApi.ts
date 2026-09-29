@@ -525,6 +525,20 @@ export const inventoryApi = createApi({
       },
     }),
 
+    // Read-only: which of the given part numbers are flagged
+    // AutoWholeunitSales in Databricks (main.staging.parts_parts_lot).
+    getAutoWholeunitParts: builder.query<
+      { autoWholeunitPartNumbers: string[] },
+      string[]
+    >({
+      query: (partNumbers) => {
+        const params = new URLSearchParams();
+        params.set("part_numbers", partNumbers.join(","));
+        return `parts/auto-wholeunit?${params.toString()}`;
+      },
+      transformResponse: (response: { data: { autoWholeunitPartNumbers: string[] } }) => response.data,
+    }),
+
     getLifeCycleStatus: builder.query<any, string | void>({
       query: (name = "") => ({
         url: "/inventory/life_cycle_status",
@@ -551,6 +565,7 @@ export const {
   useGetDistinctTouchupPensQuery,
   useGetDistinctTouchupItemsQuery,
   useGetDistinctAllItemsQuery,
+  useLazyGetAutoWholeunitPartsQuery,
   useGetLifeCycleStatusQuery,
   useGetNavETAQuery,
   useGetItemTrackingCommentsQuery,
