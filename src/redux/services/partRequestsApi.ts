@@ -79,6 +79,7 @@ interface ApiResponse<T> {
 export const partRequestsApi = createApi({
   reducerPath: "partRequestsApi",
   baseQuery: baseQueryWithReauth,
+  tagTypes: ["PartRequest"],
   endpoints: (builder) => ({
     getPartRequests: builder.query<
       PartRequestListResponse,
@@ -94,13 +95,34 @@ export const partRequestsApi = createApi({
         return `/part-requests?${params.toString()}`;
       },
       transformResponse: (res: ApiResponse<PartRequestListResponse>) => res.data,
+      providesTags: ["PartRequest"],
     }),
 
     getPartRequestDetail: builder.query<PartRequestDetail, string>({
       query: (id) => `/part-requests/${id}`,
       transformResponse: (res: ApiResponse<PartRequestDetail>) => res.data,
+      providesTags: (_result, _error, id) => [{ type: "PartRequest", id }],
+    }),
+
+    // Called only after a Shopify draft order or refund has already
+    // succeeded, from the Part Request dialog — never from Create Order.
+    markPartRequestSubmitted: builder.mutation<
+      PartRequestHeader,
+      { id: string; shopify_draft_order_id?: string | null }
+    >({
+      query: ({ id, shopify_draft_order_id }) => ({
+        url: `/part-requests/${id}/submitted`,
+        method: "PATCH",
+        body: { shopify_draft_order_id: shopify_draft_order_id ?? null },
+      }),
+      transformResponse: (res: ApiResponse<PartRequestHeader>) => res.data,
+      invalidatesTags: (_result, _error, { id }) => ["PartRequest", { type: "PartRequest", id }],
     }),
   }),
 });
 
-export const { useGetPartRequestsQuery, useGetPartRequestDetailQuery } = partRequestsApi;
+export const {
+  useGetPartRequestsQuery,
+  useGetPartRequestDetailQuery,
+  useMarkPartRequestSubmittedMutation,
+} = partRequestsApi;

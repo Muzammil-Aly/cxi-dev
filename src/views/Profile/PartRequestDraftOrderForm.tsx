@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Dialog, DialogContent } from "@mui/material";
-import { PartRequestDetail } from "@/redux/services/partRequestsApi";
+import { PartRequestDetail, useMarkPartRequestSubmittedMutation } from "@/redux/services/partRequestsApi";
 import {
   useGetShopifyReturnReasonsQuery,
   useGetShopifyReturnReasonsCodeQuery,
@@ -189,6 +189,7 @@ export default function PartRequestDraftOrderForm({
   const [createDraftOrder, { isLoading: isDraftLoading, data: draftData, error: draftError, reset: resetDraft }] =
     useCreateDraftOrderMutation();
   const [triggerAutoWholeunitCheck] = useLazyGetAutoWholeunitPartsQuery();
+  const [markSubmitted] = useMarkPartRequestSubmittedMutation();
   const zipLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -330,7 +331,7 @@ export default function PartRequestDraftOrderForm({
       return;
     }
     try {
-      await createDraftOrder({
+      const result = await createDraftOrder({
         store: storeOption.value,
         email,
         // Identifies this draft order as submitted from the Part Request
@@ -353,6 +354,18 @@ export default function PartRequestDraftOrderForm({
         vendor: vendorCode,
       }).unwrap();
       toast.success("Draft order created successfully!");
+
+      // Best-effort: the Shopify draft order already succeeded above, so a
+      // failure here shouldn't look like the whole submit failed.
+      try {
+        await markSubmitted({
+          id: header.id,
+          shopify_draft_order_id: result?.data?.id ?? null,
+        }).unwrap();
+      } catch (markErr) {
+        console.error(markErr);
+        toast.error("Draft order created, but couldn't update the request's status.");
+      }
     } catch (err) {
       console.error(err);
       toast.error("Error creating draft order");

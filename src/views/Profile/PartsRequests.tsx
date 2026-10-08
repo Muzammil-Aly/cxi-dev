@@ -33,6 +33,7 @@ import toast from "react-hot-toast";
 import {
   useGetPartRequestsQuery,
   useGetPartRequestDetailQuery,
+  useMarkPartRequestSubmittedMutation,
   PartRequestTab,
   PartRequestHeader,
 } from "@/redux/services/partRequestsApi";
@@ -81,11 +82,13 @@ const refundFieldInputStyle: React.CSSProperties = {
 };
 
 function RefundAction({
+  requestId,
   orderNo,
   store,
   sku,
   amount,
 }: {
+  requestId: string | null;
   orderNo: string | null;
   store: ReturnType<typeof matchStoreOption>;
   sku: string | null;
@@ -105,6 +108,7 @@ function RefundAction({
   const [triggerPreview, { data: preview, isFetching: isPreviewing, error: previewError }] =
     useLazyPreviewPartRequestRefundQuery();
   const [createRefund, { isLoading: isRefunding, error: createError }] = useCreatePartRequestRefundMutation();
+  const [markSubmitted] = useMarkPartRequestSubmittedMutation();
 
   const disabledReason = !store
     ? "This request's store doesn't match a known store."
@@ -151,6 +155,17 @@ function RefundAction({
       toast.success("Refund created in Shopify.");
       setDone(true);
       setOpen(false);
+
+      // Best-effort: the Shopify refund already succeeded above, so a
+      // failure here shouldn't look like the whole thing failed.
+      if (requestId) {
+        try {
+          await markSubmitted({ id: requestId }).unwrap();
+        } catch (markErr) {
+          console.error(markErr);
+          toast.error("Refund created, but couldn't update the request's status.");
+        }
+      }
     } catch {
       toast.error("Refund failed — see details below.");
     }
@@ -755,6 +770,7 @@ function DetailPanel({ requestId, onClose }: { requestId: string; onClose: () =>
                         </Typography>
                       </Box>
                       <RefundAction
+                        requestId={header?.id ?? null}
                         orderNo={header?.order_no ?? null}
                         store={matchStoreOption(header?.store)}
                         sku={item.sku}
