@@ -360,7 +360,7 @@ export default function PartRequestDraftOrderForm({
       try {
         await markSubmitted({
           id: header.id,
-          shopify_draft_order_id: result?.data?.id ?? null,
+          shopify_draft_order_id: result?.data?.draft_order?.id ?? null,
         }).unwrap();
       } catch (markErr) {
         console.error(markErr);
@@ -764,8 +764,8 @@ export default function PartRequestDraftOrderForm({
               successColor="#0369a1"
               successBg="#f0f9ff"
               adminUrl={
-                draftData?.data?.id && storeOption?.handle
-                  ? `https://admin.shopify.com/store/${storeOption.handle}/draft_orders/${draftData.data.id.split("/").pop()}`
+                draftData?.data?.draft_order?.id && storeOption?.handle
+                  ? `https://admin.shopify.com/store/${storeOption.handle}/draft_orders/${draftData.data.draft_order.id.split("/").pop()}`
                   : undefined
               }
             />
